@@ -18,24 +18,32 @@ import java.util.List;
  * AppiumDriver type, so the same page objects/step defs run against either
  * AndroidDriver or IOSDriver depending on -Dplatform (see DriverManager).
  *
- * IMPORTANT — Flutter app note:
- * HOVR's rider app is built with Flutter. Native Appium does not see Flutter
- * widgets as individual platform views the way it does for native screens — it
- * can only find elements exposed as accessibility nodes (Flutter's Semantics
- * layer). In practice this means:
- *   - byAccessibilityId(...) matches a widget's Semantics label (tooltip/label
- *     text on Android, accessibility label on iOS).
- *   - byText(...) / byTextContains(...) fall back to matching visible on-screen
- *     text — the underlying XML attribute differs by platform (Android:
- *     @text/@content-desc, iOS/XCUITest: @label/@name/@value), handled below.
- *   - Resource IDs (byId) generally do NOT work on Flutter screens.
+ * IMPORTANT — UI toolkit note (corrected 2026-08-10 against a real device dump —
+ * the app is NOT Flutter, despite earlier comments in this codebase claiming so):
+ * HOVR's rider app is built with Jetpack Compose (native Android —
+ * androidx.compose.ui.platform.ComposeView at the root of every screen we've
+ * inspected so far). Compose's accessibility tree behaves differently from both
+ * Flutter and classic Android View-based screens:
+ *   - byAccessibilityId(...) (content-desc) DOES work — confirmed present on
+ *     several elements (e.g. "Add new place", "Name", "Address", "Save" on the
+ *     saved-places screen) — better than initially assumed.
+ *   - byText(...) / byTextContains(...) (Android @text) also works — Compose
+ *     Text composables render as TextView with a real text attribute.
+ *   - resource-id is consistently EMPTY across every screen inspected so far —
+ *     Compose only exposes it if the app opts in via
+ *     `Modifier.semantics { testTagsAsResourceId = true }` + testTag(...), which
+ *     this app does not appear to use. Don't rely on resource-id locators here.
+ *   - Input fields (EditText) are frequently unlabeled themselves — the
+ *     content-desc/text often sits on a sibling/wrapper "label" node instead of
+ *     the actual editable element. When there's exactly one EditText on screen,
+ *     targeting By.className("android.widget.EditText") is more reliable than
+ *     guessing an accessibility id for the field itself.
  *
- * The exact accessibility labels used in step defs/page objects are best-effort
- * guesses based on the feature file wording and typical Flutter widget
- * conventions. Before running for real, open the app with Appium Inspector (or
- * `adb shell uiautomator dump` / Xcode Accessibility Inspector) and
- * confirm/replace each label — search for "VERIFY:" to find every one that
- * needs checking against the live app.
+ * The exact locators used in step defs/page objects are still best-effort
+ * guesses pending confirmation, marked "VERIFY:". Confirm each one against the
+ * live app — pull the page source via GET /session/:id/source on a running
+ * Appium session (or Appium Inspector) rather than assuming Flutter/native-View
+ * conventions.
  */
 public class BasePage {
 

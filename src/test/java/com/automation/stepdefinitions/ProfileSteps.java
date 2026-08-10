@@ -3,6 +3,7 @@ package com.automation.stepdefinitions;
 import com.automation.pages.BasePage;
 import io.appium.java_client.android.AndroidDriver;
 import io.cucumber.datatable.DataTable;
+import org.openqa.selenium.By;
 import io.cucumber.java.en.And;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
@@ -115,8 +116,15 @@ public class ProfileSteps {
     public void i_search_for(String query) {
         // Same Gherkin phrase is reused for both "search for an address" (saved places) and
         // "search for a help topic" — try the address field first, fall back to help search.
+        //
+        // CONFIRMED 2026-08-10 on a real device (Add New Place screen): the Address field is
+        // an unlabeled android.widget.EditText — its content-desc="Address" sits on a sibling
+        // wrapper node, not the EditText itself, so accessibility-id lookup can't target the
+        // field directly. There's exactly one EditText on this screen, so By.className works.
+        // Not yet confirmed whether other screens (e.g. destination search) have more than one
+        // EditText, which would make this selector ambiguous there — recheck if it fails.
         try {
-            ui.typeIntoPublic(ui.byAccessibilityIdPublic("place_search_field"), query); // VERIFY
+            ui.waitForPublic(By.className("android.widget.EditText")).sendKeys(query);
         } catch (Exception addressFieldNotFound) {
             ui.typeIntoPublic(ui.byAccessibilityIdPublic("help_search_bar"), query); // VERIFY
         }

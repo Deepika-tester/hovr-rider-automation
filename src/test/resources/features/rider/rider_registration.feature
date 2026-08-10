@@ -76,21 +76,21 @@ Feature: Rider Registration
   Scenario: Enter rider first and last name
     Given I have verified my phone number
     And I am on the rider name entry screen
-    When I enter first name "Jane"
-    And I enter last name "Doe"
+    When I enter first name "kerry"
+    And I enter last name "kim"
     And I tap "Continue"
     Then I should be navigated to the email entry screen
 
   Scenario: Enter name with empty first name
     Given I am on the rider name entry screen
     When I leave the first name field empty
-    And I enter last name "Doe"
+    And I enter last name "kim"
     And I tap "Continue"
     Then I should see a validation error for the first name field
 
   Scenario: Enter rider email address
     Given I am on the rider email entry screen
-    When I enter email "jane.doe@example.com"
+    When I enter email "kerry.kim@abcd.com"
     And I tap "Continue"
     Then I should be navigated to the referral code screen
 

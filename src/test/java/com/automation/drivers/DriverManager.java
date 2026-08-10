@@ -35,6 +35,10 @@ public class DriverManager {
             URL appiumUrl = new URL(ConfigReader.get("appiumServerUrl"));
             String platformName = ConfigReader.get("platformName");
 
+            if (!"iOS".equalsIgnoreCase(platformName)) {
+                grantAndroidRuntimePermissions();
+            }
+
             AppiumDriver driver = "iOS".equalsIgnoreCase(platformName)
                     ? new IOSDriver(appiumUrl, buildIosOptions())
                     : new AndroidDriver(appiumUrl, buildAndroidOptions());
@@ -45,6 +49,63 @@ public class DriverManager {
             driverThreadLocal.set(driver);
         } catch (MalformedURLException e) {
             throw new RuntimeException("Invalid Appium server URL in config.properties", e);
+        }
+    }
+
+    // Belt-and-suspenders alongside UiAutomator2Options#setAutoGrantPermissions: that capability
+    // only re-grants permissions at APP INSTALL time. With noReset=true (the common case — app
+    // already installed) plus a `pm clear` between runs (common when testing registration from a
+    // logged-out state), permissions get reset by the clear but nothing re-grants them, since no
+    // install happens. Confirmed as a real blocker on a real device 2026-08-10 — the OS
+    // "Allow location?" dialog blocked the very first screen. Calling `adb shell pm grant`
+    // directly, every time, works regardless of install/reset state.
+    private static void grantAndroidRuntimePermissions() {
+        String[] permissions = {
+                "android.permission.ACCESS_FINE_LOCATION",
+                "android.permission.ACCESS_COARSE_LOCATION",
+                "android.permission.POST_NOTIFICATIONS"
+        };
+        String appPackage = ConfigReader.get("appPackage", "");
+        for (String permission : permissions) {
+            runAdbShell("pm", "grant", appPackage, permission);
+        }
+    }
+
+    // Registration scenarios need a genuinely logged-out app to test navigation from the landing
+    // page — bringing an already-running session to the foreground (activateApp) is NOT enough,
+    // since a previously-completed registration/login in this same app install would just resume
+    // on the ride home screen. Only a real data clear + relaunch reliably lands back on the
+    // landing page. Step defs call this from their "Given I am on X screen" methods when the
+    // expected screen isn't already showing (see RegistrationSteps#ensureOnLandingPage).
+    public static void resetAppToLoggedOutState() {
+        String appPackage = ConfigReader.get("appPackage", "");
+        if (appPackage.isBlank()) {
+            return;
+        }
+        runAdbShell("pm", "clear", appPackage);
+        grantAndroidRuntimePermissions(); // pm clear wipes previously-granted permissions too
+        ((io.appium.java_client.InteractsWithApps) getDriver()).activateApp(appPackage);
+    }
+
+    private static void runAdbShell(String... shellArgs) {
+        String udid = ConfigReader.get("udid", "");
+        if (udid.isBlank()) {
+            return;
+        }
+        try {
+            String[] fullCommand = new String[shellArgs.length + 4];
+            fullCommand[0] = "adb";
+            fullCommand[1] = "-s";
+            fullCommand[2] = udid;
+            fullCommand[3] = "shell";
+            System.arraycopy(shellArgs, 0, fullCommand, 4, shellArgs.length);
+            new ProcessBuilder(fullCommand)
+                    .redirectErrorStream(true)
+                    .start()
+                    .waitFor(10, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (Exception e) {
+            // Non-fatal — adb may be unavailable in this environment (e.g. a cloud device farm
+            // reached over a non-adb protocol). Don't fail driver init/reset over it.
         }
     }
 
@@ -73,6 +134,12 @@ public class DriverManager {
         options.setNoReset(ConfigReader.getBoolean("noReset"));
         options.setFullReset(ConfigReader.getBoolean("fullReset"));
         options.setNewCommandTimeout(Duration.ofSeconds(120));
+
+        // Auto-grant every runtime permission declared in the manifest (location,
+        // notifications, etc.) at session start — without this, a fresh install/data-clear
+        // blocks the very first screen behind an OS "Allow location?" dialog our step defs
+        // don't know how to dismiss. Confirmed necessary on a real device 2026-08-10.
+        options.setAutoGrantPermissions(true);
 
         return options;
     }

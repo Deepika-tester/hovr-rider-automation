@@ -14,12 +14,14 @@ import org.testng.Assert;
 /**
  * Step definitions for src/test/resources/features/rider_registration.feature.
  *
- * LOCATOR DISCLAIMER: this app is Flutter-based. Every By.accessibilityId(...) /
- * text lookup below is a best-effort guess at the widget's Semantics label based on
- * the feature wording. Before this suite is trustworthy, connect the real device,
- * open Appium Inspector (or `adb shell uiautomator dump` + view hierarchy), and
- * correct any locator that doesn't match — search "VERIFY" across src/test/java for
- * every spot flagged as a guess.
+ * LOCATOR DISCLAIMER: see BasePage's javadoc for the UI-toolkit note — this app
+ * is Jetpack Compose, not Flutter (corrected 2026-08-10 against a real device
+ * dump). Every By.accessibilityId(...) / text lookup below is still a
+ * best-effort guess at the real content-desc/text based on the feature wording.
+ * Before this suite is trustworthy, connect the real device, open Appium
+ * Inspector (or pull GET /session/:id/source), and correct any locator that
+ * doesn't match — search "VERIFY" across src/test/java for every spot flagged
+ * as a guess.
  *
  * Steps that assert on backend behavior directly (e.g. "an OTP should be requested
  * via the IAM service") cannot be verified from the UI layer alone; here they are
@@ -44,10 +46,36 @@ public class RegistrationSteps {
     }
 
     // ---------- Landing / phone entry ----------
+    //
+    // SELF-NAVIGATING GIVEN STEPS (added 2026-08-10): each scenario gets a fresh Appium session
+    // (see Hooks), but the app itself is NOT guaranteed to be logged out — noReset=true means a
+    // previous scenario's completed registration/login persists. A "Given I am on X screen" that
+    // only asserts (the original pattern here) fails as soon as a scenario doesn't happen to run
+    // right after the one that navigated there. Confirmed as a real, systemic bug on a real
+    // device: "Enter a valid Canadian phone number" failed at its very first step for exactly
+    // this reason. Fix: each ensureOnXScreen() checks first, and if not already there, drives
+    // forward from the previous screen in the flow (recursively), with ensureOnLandingPage() as
+    // the base case that force-resets the app via DriverManager.resetAppToLoggedOutState() if
+    // even the landing page isn't showing. This makes every registration scenario independently
+    // runnable regardless of what ran before it, in any order, on a shared device.
+    //
+    // NOTE: only the landing/phone/OTP screens below have CONFIRMED real locators (per the
+    // 2026-08-10 device session). Name/email/terms/payment screens still use guessed locators
+    // (byAccessibilityIdPublic(...) placeholders) — the chain's *structure* is correct, but those
+    // links will need fixing once walked on a real device, same as any other VERIFY spot.
 
     @Given("I am on the landing page")
     public void i_am_on_the_landing_page() {
-        // No-op: Background already puts us here after launch.
+        ensureOnLandingPage();
+    }
+
+    private void ensureOnLandingPage() {
+        if (generic.isDisplayedPublic(generic.byTextPublic("Get Started"))) {
+            return;
+        }
+        com.automation.drivers.DriverManager.resetAppToLoggedOutState();
+        Assert.assertTrue(generic.waitForPublic(generic.byTextPublic("Get Started")) != null,
+                "Landing page not shown even after resetting app to a logged-out state");
     }
 
     @When("I tap the {string} button")
@@ -57,24 +85,48 @@ public class RegistrationSteps {
 
     @Then("I should see the phone number entry screen")
     public void i_should_see_the_phone_number_entry_screen() {
-        Assert.assertTrue(generic.isDisplayedPublic(generic.byAccessibilityIdPublic("phone_number_field")),
+        // CONFIRMED 2026-08-10 on a real device: heading text is literally "Enter your phone
+        // number" (@text, unmerged). The mobile-number EditText itself has no text/content-desc/
+        // resource-id at all — see i_enter_phone_number below.
+        Assert.assertTrue(generic.isDisplayedPublic(generic.byTextPublic("Enter your phone number")),
                 "Phone number entry screen not shown");
     }
 
     @Given("I am on the phone number entry screen")
     public void i_am_on_the_phone_number_entry_screen() {
+        ensureOnPhoneEntryScreen();
+    }
+
+    private void ensureOnPhoneEntryScreen() {
+        if (generic.isDisplayedPublic(generic.byTextPublic("Enter your phone number"))) {
+            return;
+        }
+        ensureOnLandingPage();
+        generic.tapTextPublic("Get Started");
         i_should_see_the_phone_number_entry_screen();
     }
 
     @When("I select country code {string}")
     public void i_select_country_code(String code) {
-        generic.tapPublic(generic.byAccessibilityIdPublic("country_code_selector"));
-        generic.tapTextPublic(code);
+        // CONFIRMED 2026-08-10: default is already Canada/+1, so every actual usage in this
+        // feature file (all three are "+1") is a same-code no-op — skip opening the picker
+        // entirely rather than risk leaving it open (confirmed real bug: it's a full-screen
+        // alphabetical list with no exposed search EditText in the accessibility tree despite
+        // showing a "Search country" placeholder, so a picker left open with the wrong country
+        // typed/tapped blocks the rest of the screen, including "Continue"). Selecting a
+        // DIFFERENT country isn't implemented — would need the search field solved first.
+        if (generic.isDisplayedPublic(generic.byTextPublic(code))) {
+            return;
+        }
+        throw new UnsupportedOperationException(
+                "Selecting a country code other than the default (+1) is not yet implemented — "
+                        + "the picker's search field isn't exposed in the accessibility tree.");
     }
 
     @When("I enter phone number {string}")
     public void i_enter_phone_number(String phoneNumber) {
-        generic.typeIntoPublic(generic.byAccessibilityIdPublic("phone_number_field"), phoneNumber);
+        // CONFIRMED 2026-08-10: only one EditText on this screen (the mobile number field).
+        generic.waitForPublic(By.className("android.widget.EditText")).sendKeys(phoneNumber);
     }
 
     @When("I enter phone number {string} without selecting a country code")
@@ -113,12 +165,29 @@ public class RegistrationSteps {
 
     @Then("I should be navigated to the OTP verification screen")
     public void i_should_be_navigated_to_otp_screen() {
-        Assert.assertTrue(generic.isDisplayedPublic(generic.byAccessibilityIdPublic("otp_input_field")),
+        // CONFIRMED 2026-08-10 on a real device: heading is literally "Enter the 6-digit code
+        // sent to you at <phone>." (@text). Despite rendering as 6 visually separate boxes, the
+        // accessibility tree exposes it as ONE EditText with max-text-length="6" — not 6 separate
+        // fields as originally guessed. See i_enter_the_correct_otp_code below.
+        Assert.assertTrue(generic.isDisplayedPublic(generic.byTextContainsPublic("digit code sent")),
                 "OTP verification screen not shown");
     }
 
     @Given("I am on the OTP verification screen")
     public void i_am_on_the_otp_verification_screen() {
+        ensureOnOtpScreen();
+    }
+
+    private void ensureOnOtpScreen() {
+        if (generic.isDisplayedPublic(generic.byTextContainsPublic("digit code sent"))) {
+            return;
+        }
+        ensureOnPhoneEntryScreen();
+        // Country code already defaults to +1 on this screen (confirmed 2026-08-10) — no need to
+        // reselect it. Test number is arbitrary; the app doesn't require it to be real to reach
+        // the OTP screen, only to eventually verify (see STAGING_BYPASS_OTP).
+        i_enter_phone_number("4165551234");
+        generic.tapTextPublic("Continue");
         i_should_be_navigated_to_otp_screen();
     }
 
@@ -152,20 +221,28 @@ public class RegistrationSteps {
         // Requires test-data/backend control to simulate; out of scope for pure UI automation.
     }
 
+    // "111111" is a confirmed staging backdoor OTP (per the team, 2026-08-10) — always accepted
+    // regardless of what was actually texted to the number. Locator is confirmed: the one
+    // EditText on this screen (see i_should_be_navigated_to_otp_screen above).
+    private static final String STAGING_BYPASS_OTP = "111111";
+
     @When("I enter the correct 6-digit OTP code")
     public void i_enter_the_correct_otp_code() {
-        // VERIFY: replace with a real test OTP retrieval mechanism (test backdoor, SMS API, etc.)
-        generic.typeIntoPublic(generic.byAccessibilityIdPublic("otp_input_field"), "123456");
+        generic.waitForPublic(By.className("android.widget.EditText")).sendKeys(STAGING_BYPASS_OTP);
     }
 
     @When("I enter an incorrect OTP code {string}")
     public void i_enter_an_incorrect_otp_code(String code) {
-        generic.typeIntoPublic(generic.byAccessibilityIdPublic("otp_input_field"), code);
+        generic.waitForPublic(By.className("android.widget.EditText")).sendKeys(code);
     }
 
     @When("I enter the expired OTP code")
     public void i_enter_the_expired_otp_code() {
-        generic.typeIntoPublic(generic.byAccessibilityIdPublic("otp_input_field"), "123456");
+        // NOTE: the bypass code above always succeeds regardless of expiry, so it can't be used
+        // here — this scenario needs a genuinely expired code, which requires waiting out a real
+        // OTP's 5-minute window (or a staging fixture that seeds one pre-expired). Placeholder
+        // "123456" left as-is; this scenario is not actually verified yet.
+        generic.waitForPublic(By.className("android.widget.EditText")).sendKeys("123456");
     }
 
     @Then("the OTP should be verified successfully via the IAM service")
@@ -222,6 +299,25 @@ public class RegistrationSteps {
 
     @Given("I am on the rider name entry screen")
     public void i_am_on_the_rider_name_entry_screen() {
+        ensureOnNameEntryScreen();
+    }
+
+    // first_name_field/last_name_field/email_field/referral_code_field below are still
+    // UNVERIFIED guesses (unlike landing/phone/OTP above) — only walked the flow on a real
+    // device as far as the OTP screen on 2026-08-10. Chain structure is correct; these
+    // individual locators and the OTP-submission mechanism (does it auto-advance on the 6th
+    // digit, or need an explicit button tap?) still need confirming.
+    private void ensureOnNameEntryScreen() {
+        if (generic.isDisplayedPublic(generic.byAccessibilityIdPublic("first_name_field"))) {
+            return;
+        }
+        ensureOnOtpScreen();
+        i_enter_the_correct_otp_code();
+        try {
+            generic.tapTextPublic("Continue"); // VERIFY: may auto-advance without this tap
+        } catch (Exception autoAdvanced) {
+            // OK — screen likely auto-advanced on the 6th digit without needing a button tap.
+        }
         Assert.assertTrue(generic.isDisplayedPublic(generic.byAccessibilityIdPublic("first_name_field")),
                 "Name entry screen not shown");
     }
@@ -255,6 +351,17 @@ public class RegistrationSteps {
 
     @Given("I am on the rider email entry screen")
     public void i_am_on_the_rider_email_entry_screen() {
+        ensureOnEmailEntryScreen();
+    }
+
+    private void ensureOnEmailEntryScreen() {
+        if (generic.isDisplayedPublic(generic.byAccessibilityIdPublic("email_field"))) {
+            return;
+        }
+        ensureOnNameEntryScreen();
+        i_enter_first_name("Jane"); // VERIFY: arbitrary placeholder name, locator unconfirmed
+        i_enter_last_name("Doe");
+        generic.tapTextPublic("Continue");
         i_should_be_navigated_to_email_screen();
     }
 
@@ -300,8 +407,31 @@ public class RegistrationSteps {
                 "Expected error: " + message);
     }
 
+    // Private, not a step definition — the referral screen's actual public Given is the shared
+    // generic "I am on the {string} screen" above (also reused by rider_booking.feature etc.),
+    // which deliberately stays a plain assertion since it can't know which domain's navigation
+    // to run. This is only for internally chaining terms/payment/welcome below.
+    private void ensureOnReferralScreen() {
+        if (generic.isDisplayedPublic(generic.byAccessibilityIdPublic("referral_code_field"))) {
+            return;
+        }
+        ensureOnEmailEntryScreen();
+        i_enter_email("jane.doe@example.com"); // VERIFY: arbitrary placeholder, locator unconfirmed
+        generic.tapTextPublic("Continue");
+        i_should_be_navigated_to_referral_screen();
+    }
+
     @Given("I am on the terms and policy screen")
     public void i_am_on_the_terms_and_policy_screen() {
+        ensureOnTermsScreen();
+    }
+
+    private void ensureOnTermsScreen() {
+        if (generic.isDisplayedPublic(generic.byTextPublic("I Accept"))) {
+            return;
+        }
+        ensureOnReferralScreen();
+        generic.tapTextPublic("Skip"); // VERIFY: exact skip-referral label unconfirmed
         i_should_be_navigated_to_terms_screen();
     }
 
@@ -324,6 +454,15 @@ public class RegistrationSteps {
 
     @Given("I am on the payment method selector screen during registration")
     public void i_am_on_payment_method_selector_screen() {
+        ensureOnPaymentScreen();
+    }
+
+    private void ensureOnPaymentScreen() {
+        if (generic.isDisplayedPublic(generic.byTextPublic("Skip for now"))) {
+            return;
+        }
+        ensureOnTermsScreen();
+        generic.tapTextPublic("I Accept");
         i_should_be_navigated_to_payment_screen();
     }
 
@@ -353,6 +492,15 @@ public class RegistrationSteps {
 
     @Given("I am on the welcome screen")
     public void i_am_on_the_welcome_screen() {
+        ensureOnWelcomeScreen();
+    }
+
+    private void ensureOnWelcomeScreen() {
+        if (generic.isDisplayedPublic(generic.byTextContainsPublic("Welcome to HOVR"))) {
+            return;
+        }
+        ensureOnPaymentScreen();
+        generic.tapTextPublic("Skip for now");
         i_should_be_navigated_to_welcome_screen();
     }
 
