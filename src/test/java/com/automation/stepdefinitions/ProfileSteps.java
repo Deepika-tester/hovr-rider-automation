@@ -83,6 +83,12 @@ public class ProfileSteps {
         ui.tapTextPublic(destination);
     }
 
+    @Given("I navigate to {string} then {string}")
+    public void i_navigate_to_then(String first, String second) {
+        ui.tapTextPublic(first);
+        ui.tapTextPublic(second);
+    }
+
     @Then("I should see my saved places list")
     public void i_should_see_saved_places_list() {
         Assert.assertTrue(ui.isDisplayedPublic(ui.byTextPublic("Add New Place")),

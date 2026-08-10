@@ -117,6 +117,11 @@ public class RegistrationSteps {
                 "OTP verification screen not shown");
     }
 
+    @Given("I am on the OTP verification screen")
+    public void i_am_on_the_otp_verification_screen() {
+        i_should_be_navigated_to_otp_screen();
+    }
+
     @Then("I should see a validation error for missing country code")
     public void i_should_see_validation_error_missing_country_code() {
         Assert.assertTrue(generic.isDisplayedPublic(generic.byTextContainsPublic("country code")),
@@ -264,6 +269,8 @@ public class RegistrationSteps {
                 "Referral code screen not shown");
     }
 
+    // Generic enough to be reused verbatim by rider_booking.feature ("I am on the "Finding
+    // your driver" screen" etc.) via Cucumber's global step registry.
     @Given("I am on the {string} screen")
     public void i_am_on_the_named_screen(String screenName) {
         Assert.assertTrue(generic.isDisplayedPublic(generic.byTextContainsPublic(screenName))

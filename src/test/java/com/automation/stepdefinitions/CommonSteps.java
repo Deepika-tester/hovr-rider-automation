@@ -1,6 +1,8 @@
 package com.automation.stepdefinitions;
 
 import com.automation.pages.BasePage;
+import io.cucumber.java.en.And;
+import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
 import org.testng.Assert;
@@ -46,4 +48,25 @@ public class CommonSteps {
         Assert.assertTrue(ui.isDisplayedPublic(ui.byTextPublic(message)),
                 "Expected validation error: " + message);
     }
+
+    // ---------------------------------------------------------------
+    // Shared preconditions/outcomes reused verbatim across multiple
+    // feature files (rider_booking, rider_trip, rider_payment,
+    // rider_promo). Kept here rather than duplicated per domain class.
+    // ---------------------------------------------------------------
+
+    @Given("I have a valid payment method")
+    public void i_have_a_valid_payment_method() {
+        // Test-data precondition — assumes the test account already has a card on file.
+    }
+
+    @And("I should be returned to the home screen")
+    public void i_should_be_returned_to_the_home_screen() {
+        Assert.assertTrue(ui.isDisplayedPublic(ui.byTextContainsPublic("Where to")), // VERIFY home-screen anchor text
+                "Expected to return to the ride home screen");
+    }
+
+    // "there is no network connectivity" / "I should see a network error message" are already
+    // defined in RegistrationSteps — reused verbatim by rider_booking/rider_trip/rider_payment
+    // via Cucumber's global step registry, not re-declared here.
 }
