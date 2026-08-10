@@ -1,0 +1,29 @@
+# IntelliJ
+.idea/
+*.iml
+
+# Maven
+target/
+
+# Logs
+logs/
+*.log
+
+# Allure
+allure-results/
+allure-report/
+
+# Screenshots
+screenshots/
+
+# Videos
+videos/
+
+# macOS
+.DS_Store
+
+# Environment
+.env
+
+# APKs under test
+apps/

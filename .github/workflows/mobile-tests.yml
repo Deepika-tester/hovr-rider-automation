@@ -1,0 +1,115 @@
+name: Mobile QA Suite
+
+# Runs the Cucumber/TestNG/Appium suite against the real Android device and/or
+# iOS simulator attached to the self-hosted runner. Assumes the runner host
+# already has, installed once and kept warm (not something this workflow
+# installs on every run): Xcode + command line tools, Android SDK platform
+# tools (adb), Node.js + Appium (with the uiautomator2 and xcuitest drivers),
+# and a connected/paired Android device plus a bootable iOS simulator.
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: "Platform to run (android, ios, or both)"
+        required: false
+        default: both
+        type: choice
+        options: [both, android, ios]
+
+jobs:
+  mobile-tests:
+    name: ${{ matrix.platform }}
+    runs-on: [self-hosted, mobile-qa]
+    # Only one physical device/simulator per runner — don't run platforms concurrently.
+    strategy:
+      max-parallel: 1
+      fail-fast: false
+      matrix:
+        platform: [android, ios]
+
+    steps:
+      - name: Skip this leg if a single platform was requested
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.platform != 'both' && github.event.inputs.platform != matrix.platform
+        run: echo "SKIP_LEG=true" >> "$GITHUB_ENV"
+
+      - name: Checkout
+        if: env.SKIP_LEG != 'true'
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        if: env.SKIP_LEG != 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Sanity-check Android device
+        if: env.SKIP_LEG != 'true' && matrix.platform == 'android'
+        run: |
+          adb start-server
+          adb devices -l
+          if ! adb devices | grep -q "device$"; then
+            echo "::error::No Android device/emulator attached to this runner."
+            exit 1
+          fi
+
+      - name: Boot iOS simulator
+        if: env.SKIP_LEG != 'true' && matrix.platform == 'ios'
+        run: |
+          xcrun simctl bootstatus "${IOS_SIMULATOR_UDID:-booted}" -b || true
+          xcrun simctl list devices | grep -i booted || echo "::warning::No iOS simulator currently booted; Appium will attempt to boot one from ios.properties."
+
+      - name: Ensure Appium server is running
+        if: env.SKIP_LEG != 'true'
+        run: |
+          if curl -sf http://127.0.0.1:4723/status > /dev/null; then
+            echo "Appium already running."
+            echo "STARTED_APPIUM=false" >> "$GITHUB_ENV"
+          else
+            nohup appium --base-path / > appium.log 2>&1 &
+            echo $! > appium.pid
+            for i in {1..30}; do
+              curl -sf http://127.0.0.1:4723/status > /dev/null && break
+              sleep 1
+            done
+            echo "STARTED_APPIUM=true" >> "$GITHUB_ENV"
+          fi
+
+      - name: Run ${{ matrix.platform }} suite
+        if: env.SKIP_LEG != 'true'
+        run: mvn -B test -Dplatform=${{ matrix.platform }}
+
+      - name: Generate Allure report
+        if: always() && env.SKIP_LEG != 'true'
+        run: |
+          if command -v allure > /dev/null; then
+            allure generate allure-results --clean -o allure-report
+          else
+            echo "::warning::allure commandline not installed on runner — skipping HTML report generation."
+          fi
+
+      - name: Upload test reports
+        if: always() && env.SKIP_LEG != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports-${{ matrix.platform }}-${{ github.run_number }}
+          retention-days: 14
+          if-no-files-found: ignore
+          path: |
+            target/cucumber-reports/
+            target/surefire-reports/
+            allure-results/
+            allure-report/
+
+      - name: Stop Appium server (if we started it)
+        if: always() && env.SKIP_LEG != 'true'
+        run: |
+          if [ "$STARTED_APPIUM" = "true" ] && [ -f appium.pid ]; then
+            kill "$(cat appium.pid)" || true
+            rm -f appium.pid
+          fi
