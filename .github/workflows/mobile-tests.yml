@@ -7,10 +7,15 @@ name: Mobile QA Suite
 # tools (adb), Node.js + Appium (with the uiautomator2 and xcuitest drivers),
 # and a connected/paired Android device plus a bootable iOS simulator.
 on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main, develop]
+  # push/pull_request triggers deliberately disabled for now — this workflow requires a
+  # self-hosted runner labeled "mobile-qa" (see runs-on below), which isn't registered yet.
+  # Without one, every push/PR queues a check run that sits pending forever (confirmed
+  # 2026-08-10: showed as a stuck "0/2" check on every commit). Once a runner with that
+  # label is online, uncomment these to re-enable automatic runs:
+  # push:
+  #   branches: [main, develop]
+  # pull_request:
+  #   branches: [main, develop]
   workflow_dispatch:
     inputs:
       platform:
