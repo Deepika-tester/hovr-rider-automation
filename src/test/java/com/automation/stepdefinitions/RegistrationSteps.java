@@ -129,9 +129,9 @@ public class RegistrationSteps {
         generic.waitForPublic(By.className("android.widget.EditText")).sendKeys(phoneNumber);
     }
 
-    @When("I enter phone number {string} without selecting a country code")
-    public void i_enter_phone_number_without_country_code(String phoneNumber) {
-        i_enter_phone_number(phoneNumber);
+    @When("I tap {string} without entering a phone number")
+    public void i_tap_continue_without_entering_phone_number(String buttonLabel) {
+        generic.tapTextPublic(buttonLabel);
     }
 
     @When("I enter a phone number registered to an unsupported region")
@@ -199,12 +199,6 @@ public class RegistrationSteps {
     // subscriber), so this can't collide with a real number. The last 4 digits change every run.
     private static String uniqueTestPhoneNumber() {
         return "416555" + String.format("%04d", System.currentTimeMillis() % 10_000);
-    }
-
-    @Then("I should see a validation error for missing country code")
-    public void i_should_see_validation_error_missing_country_code() {
-        Assert.assertTrue(generic.isDisplayedPublic(generic.byTextContainsPublic("country code")),
-                "Expected missing-country-code validation error");
     }
 
     @Then("I should be navigated to the {string} screen")

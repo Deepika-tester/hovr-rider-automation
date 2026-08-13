@@ -22,11 +22,15 @@ Feature: Rider Registration
     Then an OTP should be requested via the IAM service
     And I should be navigated to the OTP verification screen
 
-  Scenario: Enter phone number without country code
+  # CONFIRMED 2026-08-13: the country code selector can't actually be cleared/removed on the
+  # real app — it's always locked to a selection (+1 by default), so "no country code selected"
+  # isn't a reachable state. Reinterpreted as the closest real equivalent: leaving the number
+  # field itself empty (was "Enter phone number without country code" / "validation error for
+  # missing country code").
+  Scenario: Leave the phone number field empty
     Given I am on the phone number entry screen
-    When I enter phone number "4165551234" without selecting a country code
-    And I tap "Continue"
-    Then I should see a validation error for missing country code
+    When I tap "Continue" without entering a phone number
+    Then I should see a validation error "enter your phone number"
 
   Scenario: Enter an invalid phone number format
     Given I am on the phone number entry screen

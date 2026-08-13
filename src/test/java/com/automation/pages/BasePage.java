@@ -61,18 +61,44 @@ public class BasePage {
         return AppiumBy.accessibilityId(label);
     }
 
-    protected By byText(String visibleText) {
-        if (driver instanceof AndroidDriver) {
-            return AppiumBy.xpath("//*[@text='" + visibleText + "' or @content-desc='" + visibleText + "']");
+    // CONFIRMED 2026-08-13 on a real device: naively wrapping search text in single quotes broke
+    // on the very first apostrophe we hit ("couldn't use this number") — XPathParserException,
+    // since the apostrophe closed the string literal early. English UI copy is full of these
+    // ("don't", "isn't", "What's your name?"), so this needed a real fix, not a one-off escape.
+    // Standard XPath 1.0 trick: no concat()-free way to embed both quote types in one literal, so
+    // build via concat() when the value contains a single quote.
+    private static String xpathLiteral(String value) {
+        if (!value.contains("'")) {
+            return "'" + value + "'";
         }
-        return AppiumBy.xpath("//*[@label='" + visibleText + "' or @name='" + visibleText + "' or @value='" + visibleText + "']");
+        if (!value.contains("\"")) {
+            return "\"" + value + "\"";
+        }
+        StringBuilder sb = new StringBuilder("concat(");
+        String[] parts = value.split("'", -1);
+        for (int i = 0; i < parts.length; i++) {
+            sb.append("'").append(parts[i]).append("'");
+            if (i < parts.length - 1) {
+                sb.append(", \"'\", ");
+            }
+        }
+        return sb.append(")").toString();
+    }
+
+    protected By byText(String visibleText) {
+        String literal = xpathLiteral(visibleText);
+        if (driver instanceof AndroidDriver) {
+            return AppiumBy.xpath("//*[@text=" + literal + " or @content-desc=" + literal + "]");
+        }
+        return AppiumBy.xpath("//*[@label=" + literal + " or @name=" + literal + " or @value=" + literal + "]");
     }
 
     protected By byTextContains(String partialText) {
+        String literal = xpathLiteral(partialText);
         if (driver instanceof AndroidDriver) {
-            return AppiumBy.xpath("//*[contains(@text,'" + partialText + "') or contains(@content-desc,'" + partialText + "')]");
+            return AppiumBy.xpath("//*[contains(@text," + literal + ") or contains(@content-desc," + literal + ")]");
         }
-        return AppiumBy.xpath("//*[contains(@label,'" + partialText + "') or contains(@name,'" + partialText + "') or contains(@value,'" + partialText + "')]");
+        return AppiumBy.xpath("//*[contains(@label," + literal + ") or contains(@name," + literal + ") or contains(@value," + literal + ")]");
     }
 
     protected WebElement waitFor(By locator) {
