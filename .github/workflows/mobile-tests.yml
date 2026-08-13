@@ -98,6 +98,10 @@ jobs:
             echo "::warning::allure commandline not installed on runner — skipping HTML report generation."
           fi
 
+      - name: Generate HTML/PDF pass-fail report
+        if: always() && env.SKIP_LEG != 'true'
+        run: mvn -q exec:java@generate-report
+
       - name: Upload test reports
         if: always() && env.SKIP_LEG != 'true'
         uses: actions/upload-artifact@v4
@@ -108,6 +112,7 @@ jobs:
           path: |
             target/cucumber-reports/
             target/surefire-reports/
+            target/test-report/
             allure-results/
             allure-report/
 

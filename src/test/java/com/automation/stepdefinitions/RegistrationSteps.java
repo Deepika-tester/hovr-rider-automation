@@ -184,11 +184,21 @@ public class RegistrationSteps {
         }
         ensureOnPhoneEntryScreen();
         // Country code already defaults to +1 on this screen (confirmed 2026-08-10) — no need to
-        // reselect it. Test number is arbitrary; the app doesn't require it to be real to reach
-        // the OTP screen, only to eventually verify (see STAGING_BYPASS_OTP).
-        i_enter_phone_number("4165551234");
+        // reselect it. MUST be a fresh number each run, not a fixed one: confirmed 2026-08-13
+        // against the real staging backend that accepting Terms of Service actually creates the
+        // account server-side, so replaying a previously-completed number just logs straight
+        // into the existing account (ride home screen) instead of reaching name/email/etc. —
+        // that's exactly what broke "Skip payment method during registration" after an earlier
+        // run had already completed registration with the old hardcoded "4165551234".
+        i_enter_phone_number(uniqueTestPhoneNumber());
         generic.tapTextPublic("Continue");
         i_should_be_navigated_to_otp_screen();
+    }
+
+    // "555" is the North American fictional-use exchange code (never assigned to a real
+    // subscriber), so this can't collide with a real number. The last 4 digits change every run.
+    private static String uniqueTestPhoneNumber() {
+        return "416555" + String.format("%04d", System.currentTimeMillis() % 10_000);
     }
 
     @Then("I should see a validation error for missing country code")
@@ -252,7 +262,7 @@ public class RegistrationSteps {
 
     @Then("I should be navigated to the profile setup flow")
     public void i_should_be_navigated_to_profile_setup_flow() {
-        Assert.assertTrue(generic.isDisplayedPublic(generic.byAccessibilityIdPublic("first_name_field")),
+        Assert.assertTrue(generic.isDisplayedPublic(FIRST_NAME_FIELD),
                 "Profile setup (name entry) screen not shown");
     }
 
@@ -302,44 +312,52 @@ public class RegistrationSteps {
         ensureOnNameEntryScreen();
     }
 
-    // first_name_field/last_name_field/email_field/referral_code_field below are still
-    // UNVERIFIED guesses (unlike landing/phone/OTP above) — only walked the flow on a real
-    // device as far as the OTP screen on 2026-08-10. Chain structure is correct; these
-    // individual locators and the OTP-submission mechanism (does it auto-advance on the 6th
-    // digit, or need an explicit button tap?) still need confirming.
+    // CONFIRMED 2026-08-10 on a real device: "What's your name?" screen has THREE EditTexts
+    // (First name on ID / Last name on ID / Preferred name, the last one optional) — none have
+    // text/content-desc, only a distinguishing `hint` attribute. Also confirmed: the OTP screen
+    // auto-advances to this screen as soon as the 6th digit is entered — no Continue tap needed
+    // (the try/catch below already handled that possibility correctly).
+    // referral_code_field further down is still an UNVERIFIED guess (email screen confirmed too,
+    // see i_should_be_navigated_to_email_screen).
+    private static final By FIRST_NAME_FIELD = By.xpath("//android.widget.EditText[@hint='First name on ID']");
+    private static final By LAST_NAME_FIELD = By.xpath("//android.widget.EditText[@hint='Last name on ID']");
+    private static final By PREFERRED_NAME_FIELD = By.xpath("//android.widget.EditText[@hint='Optional']");
+
     private void ensureOnNameEntryScreen() {
-        if (generic.isDisplayedPublic(generic.byAccessibilityIdPublic("first_name_field"))) {
+        if (generic.isDisplayedPublic(FIRST_NAME_FIELD)) {
             return;
         }
         ensureOnOtpScreen();
         i_enter_the_correct_otp_code();
         try {
-            generic.tapTextPublic("Continue"); // VERIFY: may auto-advance without this tap
+            generic.tapTextPublic("Continue");
         } catch (Exception autoAdvanced) {
-            // OK — screen likely auto-advanced on the 6th digit without needing a button tap.
+            // Expected — the OTP screen auto-advances on the 6th digit, no Continue button here.
         }
-        Assert.assertTrue(generic.isDisplayedPublic(generic.byAccessibilityIdPublic("first_name_field")),
+        Assert.assertTrue(generic.isDisplayedPublic(FIRST_NAME_FIELD),
                 "Name entry screen not shown");
     }
 
     @When("I enter first name {string}")
     public void i_enter_first_name(String firstName) {
-        generic.typeIntoPublic(generic.byAccessibilityIdPublic("first_name_field"), firstName);
+        generic.typeIntoPublic(FIRST_NAME_FIELD, firstName);
     }
 
     @When("I enter last name {string}")
     public void i_enter_last_name(String lastName) {
-        generic.typeIntoPublic(generic.byAccessibilityIdPublic("last_name_field"), lastName);
+        generic.typeIntoPublic(LAST_NAME_FIELD, lastName);
     }
 
     @When("I leave the first name field empty")
     public void i_leave_first_name_empty() {
-        generic.waitForPublic(generic.byAccessibilityIdPublic("first_name_field")).clear();
+        generic.waitForPublic(FIRST_NAME_FIELD).clear();
     }
 
+    // CONFIRMED 2026-08-10: heading is literally "What's your email?" (@text); single unlabeled
+    // EditText on screen (hint="name@email.com", pre-focused on load).
     @Then("I should be navigated to the email entry screen")
     public void i_should_be_navigated_to_email_screen() {
-        Assert.assertTrue(generic.isDisplayedPublic(generic.byAccessibilityIdPublic("email_field")),
+        Assert.assertTrue(generic.isDisplayedPublic(generic.byTextContainsPublic("your email")),
                 "Email entry screen not shown");
     }
 
@@ -355,11 +373,11 @@ public class RegistrationSteps {
     }
 
     private void ensureOnEmailEntryScreen() {
-        if (generic.isDisplayedPublic(generic.byAccessibilityIdPublic("email_field"))) {
+        if (generic.isDisplayedPublic(generic.byTextContainsPublic("your email"))) {
             return;
         }
         ensureOnNameEntryScreen();
-        i_enter_first_name("Jane"); // VERIFY: arbitrary placeholder name, locator unconfirmed
+        i_enter_first_name("Jane"); // VERIFY: arbitrary placeholder name
         i_enter_last_name("Doe");
         generic.tapTextPublic("Continue");
         i_should_be_navigated_to_email_screen();
@@ -367,12 +385,24 @@ public class RegistrationSteps {
 
     @When("I enter email {string}")
     public void i_enter_email(String email) {
-        generic.typeIntoPublic(generic.byAccessibilityIdPublic("email_field"), email);
+        generic.typeIntoPublic(By.className("android.widget.EditText"), email);
     }
 
+    // CONFIRMED 2026-08-12 on a real device — TWO surprises vs. what the feature file assumes:
+    //   1. Actual screen order is Email -> Terms -> Referral Code -> Payment, NOT
+    //      Email -> Referral -> Terms as rider_registration.feature's scenario ordering implies.
+    //      The chain below follows the real order; the feature file's Gherkin scenario order
+    //      is just narrative and doesn't affect execution since each scenario sets up its own
+    //      preconditions via Given, so this doesn't break anything — just noting the mismatch.
+    //   2. Heading is "Do you have a referral code?" (content-desc); single unlabeled EditText;
+    //      Skip button confirmed (content-desc="Skip", matches feature file). BUT the "apply"
+    //      button in rider_registration.feature's Gherkin is quoted as "Apply" — the real button
+    //      says "Redeem Code". Those specific scenarios (Enter a valid/invalid referral code)
+    //      will fail on the literal tap("Apply") until either the feature file wording or the
+    //      app is reconciled — flagging rather than silently rewriting the spec's wording.
     @Then("I should be navigated to the referral code screen")
     public void i_should_be_navigated_to_referral_screen() {
-        Assert.assertTrue(generic.isDisplayedPublic(generic.byAccessibilityIdPublic("referral_code_field")),
+        Assert.assertTrue(generic.isDisplayedPublic(generic.byTextContainsPublic("referral code")),
                 "Referral code screen not shown");
     }
 
@@ -380,19 +410,20 @@ public class RegistrationSteps {
     // your driver" screen" etc.) via Cucumber's global step registry.
     @Given("I am on the {string} screen")
     public void i_am_on_the_named_screen(String screenName) {
-        Assert.assertTrue(generic.isDisplayedPublic(generic.byTextContainsPublic(screenName))
-                        || generic.isDisplayedPublic(generic.byAccessibilityIdPublic("referral_code_field")),
+        Assert.assertTrue(generic.isDisplayedPublic(generic.byTextContainsPublic(screenName)),
                 "Expected to be on screen: " + screenName);
     }
 
     @When("I enter referral code {string}")
     public void i_enter_referral_code(String code) {
-        generic.typeIntoPublic(generic.byAccessibilityIdPublic("referral_code_field"), code);
+        generic.typeIntoPublic(By.className("android.widget.EditText"), code);
     }
 
+    // CONFIRMED 2026-08-12: heading is "Accept Hovr's Terms of Service"; the action button says
+    // "Agree and continue" (content-desc), NOT "I Accept" as originally guessed.
     @Then("I should be navigated to the terms and policy screen")
     public void i_should_be_navigated_to_terms_screen() {
-        Assert.assertTrue(generic.isDisplayedPublic(generic.byTextPublic("I Accept")),
+        Assert.assertTrue(generic.isDisplayedPublic(generic.byTextContainsPublic("Terms of Service")),
                 "Terms and policy screen not shown");
     }
 
@@ -410,14 +441,13 @@ public class RegistrationSteps {
     // Private, not a step definition — the referral screen's actual public Given is the shared
     // generic "I am on the {string} screen" above (also reused by rider_booking.feature etc.),
     // which deliberately stays a plain assertion since it can't know which domain's navigation
-    // to run. This is only for internally chaining terms/payment/welcome below.
+    // to run. This is only for internally chaining payment/welcome below.
     private void ensureOnReferralScreen() {
-        if (generic.isDisplayedPublic(generic.byAccessibilityIdPublic("referral_code_field"))) {
+        if (generic.isDisplayedPublic(generic.byTextContainsPublic("referral code"))) {
             return;
         }
-        ensureOnEmailEntryScreen();
-        i_enter_email("jane.doe@example.com"); // VERIFY: arbitrary placeholder, locator unconfirmed
-        generic.tapTextPublic("Continue");
+        ensureOnTermsScreen();
+        generic.tapTextPublic("Agree and continue");
         i_should_be_navigated_to_referral_screen();
     }
 
@@ -427,11 +457,12 @@ public class RegistrationSteps {
     }
 
     private void ensureOnTermsScreen() {
-        if (generic.isDisplayedPublic(generic.byTextPublic("I Accept"))) {
+        if (generic.isDisplayedPublic(generic.byTextContainsPublic("Terms of Service"))) {
             return;
         }
-        ensureOnReferralScreen();
-        generic.tapTextPublic("Skip"); // VERIFY: exact skip-referral label unconfirmed
+        ensureOnEmailEntryScreen();
+        i_enter_email("jane.doe@example.com"); // VERIFY: arbitrary placeholder
+        generic.tapTextPublic("Continue");
         i_should_be_navigated_to_terms_screen();
     }
 
@@ -448,7 +479,7 @@ public class RegistrationSteps {
 
     @Then("I should not be able to proceed with registration")
     public void i_should_not_be_able_to_proceed() {
-        Assert.assertTrue(generic.isDisplayedPublic(generic.byTextPublic("I Accept")),
+        Assert.assertTrue(generic.isDisplayedPublic(generic.byTextContainsPublic("Terms of Service")),
                 "Expected to remain on terms screen after declining");
     }
 
@@ -461,8 +492,10 @@ public class RegistrationSteps {
         if (generic.isDisplayedPublic(generic.byTextPublic("Skip for now"))) {
             return;
         }
-        ensureOnTermsScreen();
-        generic.tapTextPublic("I Accept");
+        // Real order is Terms -> Referral -> Payment (see ensureOnReferralScreen note) — skip
+        // the referral step to reach payment.
+        ensureOnReferralScreen();
+        generic.tapTextPublic("Skip");
         i_should_be_navigated_to_payment_screen();
     }
 
@@ -534,6 +567,10 @@ public class RegistrationSteps {
 
     @When("I enter my phone number and verify with OTP")
     public void i_enter_phone_and_verify_with_otp() {
+        // Deliberately the FIXED number here, not uniqueTestPhoneNumber() — this scenario
+        // ("Returning user login") specifically needs a number that has already completed
+        // registration, to verify login skips profile setup. "4165551234" is the one number we
+        // know for certain has already registered on this backend (confirmed 2026-08-13).
         i_enter_phone_number("4165551234");
         generic.tapTextPublic("Continue");
         i_enter_the_correct_otp_code();
@@ -546,7 +583,7 @@ public class RegistrationSteps {
 
     @Then("I should not see the profile setup flow")
     public void i_should_not_see_profile_setup_flow() {
-        Assert.assertFalse(generic.isDisplayedPublic(generic.byAccessibilityIdPublic("first_name_field")),
+        Assert.assertFalse(generic.isDisplayedPublic(FIRST_NAME_FIELD),
                 "Should not see profile setup after returning-user login");
     }
 
@@ -559,7 +596,7 @@ public class RegistrationSteps {
 
     @When("I enter a valid phone number and tap {string}")
     public void i_enter_valid_phone_number_and_tap(String buttonLabel) {
-        i_enter_phone_number("4165551234");
+        i_enter_phone_number(uniqueTestPhoneNumber());
         generic.tapTextPublic(buttonLabel);
     }
 

@@ -3,6 +3,8 @@ package com.automation.pages;
 import com.automation.drivers.DriverManager;
 import io.appium.java_client.AppiumBy;
 import io.appium.java_client.AppiumDriver;
+import io.appium.java_client.HasOnScreenKeyboard;
+import io.appium.java_client.HidesKeyboard;
 import io.appium.java_client.android.AndroidDriver;
 import org.openqa.selenium.By;
 import org.openqa.selenium.NoSuchElementException;
@@ -82,7 +84,24 @@ public class BasePage {
     }
 
     protected void tap(By locator) {
+        // CONFIRMED 2026-08-10: the on-screen keyboard covers/intercepts taps on buttons below
+        // a text field (e.g. "Continue" on the name/email entry screens) until it's dismissed —
+        // a real element.click() still lands on the keyboard, not the button underneath, since
+        // it's a real touch at the element's screen coordinates. Defensively hide the keyboard
+        // (if shown) before every tap so callers don't each need to remember this.
+        hideKeyboardIfShown();
         waitForClickable(locator).click();
+    }
+
+    private void hideKeyboardIfShown() {
+        try {
+            if (driver instanceof HasOnScreenKeyboard hasKeyboard && hasKeyboard.isKeyboardShown()) {
+                ((HidesKeyboard) driver).hideKeyboard();
+            }
+        } catch (Exception e) {
+            // Best-effort — never fail a tap over keyboard-visibility detection not being
+            // supported/erroring on a given platform/driver version.
+        }
     }
 
     protected void tapText(String visibleText) {
@@ -90,7 +109,14 @@ public class BasePage {
     }
 
     protected void typeInto(By locator, String value) {
+        // CONFIRMED 2026-08-10 on a real device: sendKeys silently no-ops on a Compose EditText
+        // that isn't already focused (e.g. the "Last name on ID" field on the name-entry screen —
+        // typing into it right after the "First name" field, which WAS pre-focused by the app,
+        // did nothing until the element was tapped first). Fields that happen to be pre-focused
+        // on screen load (phone number, OTP) worked without this; anything else silently failed.
+        // Tapping first makes this reliable everywhere, not just where we happened to get lucky.
         WebElement el = waitFor(locator);
+        el.click();
         el.clear();
         el.sendKeys(value);
     }
