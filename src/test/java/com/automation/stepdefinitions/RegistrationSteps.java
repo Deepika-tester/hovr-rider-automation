@@ -134,12 +134,6 @@ public class RegistrationSteps {
         generic.tapTextPublic(buttonLabel);
     }
 
-    @When("I enter a phone number registered to an unsupported region")
-    public void i_enter_unsupported_region_number() {
-        // VERIFY: substitute a real test phone number known to map to an unsupported region.
-        i_enter_phone_number("+447911123456");
-    }
-
     @When("I tap {string} or {string}")
     public void i_tap_either(String option1, String option2) {
         if (generic.isDisplayedPublic(generic.byTextPublic(option1))) {

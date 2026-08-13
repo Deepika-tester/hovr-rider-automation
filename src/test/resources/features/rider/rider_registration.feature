@@ -39,13 +39,14 @@ Feature: Rider Registration
     And I tap "Continue"
     Then I should see a validation error "couldn't use this number"
 
-  Scenario: Enter phone number from unsupported region
-    Given I am on the phone number entry screen
-    When I select country code "+1"
-    And I enter a phone number registered to an unsupported region
-    And I tap "Continue"
-    Then I should be navigated to the "Not Available In Your Region" screen
-    And I should see a message indicating HOVR is not yet available in my area
+  # "Enter phone number from unsupported region" moved to rider_booking.feature
+  # (2026-08-13, user-approved): confirmed on a real device that neither the phone number's
+  # area code (tested a Vancouver 604 number, not GTA/Ottawa) nor the device's actual GPS
+  # location (physically in India throughout this whole session) blocks registration — the
+  # phone number just proceeds straight to OTP regardless. The "Active Marketplaces: GTA,
+  # Ottawa" business rule is a ride-BOOKING-time concern, matching rider_booking.feature's
+  # existing "I am located in a supported marketplace" Background precondition, not a
+  # registration-time one.
 
   # --- OTP VERIFICATION ---
 

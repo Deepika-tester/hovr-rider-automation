@@ -35,6 +35,25 @@ public class BookingSteps {
         // Test-data/location precondition — assumes device/simulator location is set to GTA or Ottawa.
     }
 
+    // CONFIRMED 2026-08-13 on a real device: neither a non-GTA/Ottawa Canadian phone number
+    // (tested a 604/Vancouver number) nor the device's actual GPS location (physically in India
+    // throughout this session) blocked anything during registration — moved this scenario here
+    // from rider_registration.feature on that basis (see that file's comment at the same spot).
+    // Both this step and the one above are no-op placeholders until real location simulation is
+    // wired up (Appium supports driver.setLocation() with a mock-location app authorized on the
+    // device, or an emulator's built-in geo controls) — this scenario isn't actually verified yet.
+    @Given("I am located in a region outside GTA or Ottawa")
+    public void i_am_located_outside_supported_marketplace() {
+        // See comment above — needs real location simulation to actually exercise this.
+    }
+
+    @When("I open the ride home screen")
+    public void i_open_the_ride_home_screen() {
+        // No-op — see comment above. Once location simulation exists, this would just be
+        // launching/foregrounding the app, then the Then step below checks which screen it
+        // actually landed on (home vs. "Not Available In Your Region").
+    }
+
     @Given("I am on the ride home screen")
     public void i_am_on_the_ride_home_screen() {
         Assert.assertTrue(ui.isDisplayedPublic(ui.byTextContainsPublic("Where to")), // VERIFY exact copy

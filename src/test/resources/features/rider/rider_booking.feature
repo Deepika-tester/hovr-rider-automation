@@ -178,3 +178,13 @@ Feature: Rider Ride Booking
     And I enter a new destination "CN Tower, Toronto"
     Then the fare should be recalculated
     And I should see updated ride type options
+
+  # Moved here from rider_registration.feature (2026-08-13, user-approved) — see that file's
+  # comment at the same spot for why. Overrides this file's Background "I am located in a
+  # supported marketplace" step, which is a no-op placeholder today; this scenario needs its
+  # own precondition to actually exercise the opposite case once location can be simulated.
+  Scenario: Attempt to use the app from an unsupported marketplace
+    Given I am located in a region outside GTA or Ottawa
+    When I open the ride home screen
+    Then I should be navigated to the "Not Available In Your Region" screen
+    And I should see a message indicating HOVR is not yet available in my area
