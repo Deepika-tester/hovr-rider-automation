@@ -110,7 +110,7 @@ Feature: Rider Registration
   Scenario: Enter a valid referral code
     Given I am on the "Do you have a referral code?" screen
     When I enter referral code "HOVR2026"
-    And I tap "Apply"
+    And I tap "Redeem Code"
     Then the referral code should be validated
     And I should see a success confirmation
     And I should be navigated to the terms and policy screen
@@ -118,7 +118,7 @@ Feature: Rider Registration
   Scenario: Enter an invalid referral code
     Given I am on the "Do you have a referral code?" screen
     When I enter referral code "INVALID123"
-    And I tap "Apply"
+    And I tap "Redeem Code"
     Then I should see an error "Invalid referral code"
 
   # --- TERMS AND POLICY ---
@@ -126,7 +126,7 @@ Feature: Rider Registration
   Scenario: Accept terms and conditions
     Given I am on the terms and policy screen
     When I review the terms of service
-    And I tap "I Accept"
+    And I tap "Agree and continue"
     Then I should be navigated to the payment method screen
 
   Scenario: Decline terms and conditions
@@ -138,7 +138,7 @@ Feature: Rider Registration
 
   Scenario: Add payment method during registration
     Given I am on the payment method selector screen during registration
-    When I select "Add Credit/Debit Card"
+    When I select "Credit or debit card"
     And I enter valid card details
     And I tap "Save"
     Then the payment method should be saved via Adyen
@@ -146,7 +146,7 @@ Feature: Rider Registration
 
   Scenario: Skip payment method during registration
     Given I am on the payment method selector screen during registration
-    When I tap "Skip for now"
+    When I tap "Skip"
     Then I should be navigated to the welcome screen
     And my account should be created without a payment method
 

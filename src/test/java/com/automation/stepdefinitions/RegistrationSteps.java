@@ -395,11 +395,10 @@ public class RegistrationSteps {
     //      is just narrative and doesn't affect execution since each scenario sets up its own
     //      preconditions via Given, so this doesn't break anything — just noting the mismatch.
     //   2. Heading is "Do you have a referral code?" (content-desc); single unlabeled EditText;
-    //      Skip button confirmed (content-desc="Skip", matches feature file). BUT the "apply"
-    //      button in rider_registration.feature's Gherkin is quoted as "Apply" — the real button
-    //      says "Redeem Code". Those specific scenarios (Enter a valid/invalid referral code)
-    //      will fail on the literal tap("Apply") until either the feature file wording or the
-    //      app is reconciled — flagging rather than silently rewriting the spec's wording.
+    //      Skip button confirmed (content-desc="Skip", matches feature file). The real "apply"
+    //      button says "Redeem Code", not "Apply" as originally in the Gherkin — feature file
+    //      wording updated to match (2026-08-13, user-approved: app is the source of truth for
+    //      UI copy, scenario intent unchanged).
     @Then("I should be navigated to the referral code screen")
     public void i_should_be_navigated_to_referral_screen() {
         Assert.assertTrue(generic.isDisplayedPublic(generic.byTextContainsPublic("referral code")),
@@ -471,9 +470,12 @@ public class RegistrationSteps {
         // Scrolling/reading — no assertion needed unless a "scrolled to bottom" gate exists.
     }
 
+    // CONFIRMED 2026-08-13: heading is "Payment Methods"; options are "Google Pay" and "Credit
+    // or debit card"; skip button says "Skip". Feature file wording updated to match (was
+    // "Add Credit/Debit Card" and "Skip for now").
     @Then("I should be navigated to the payment method screen")
     public void i_should_be_navigated_to_payment_screen() {
-        Assert.assertTrue(generic.isDisplayedPublic(generic.byTextPublic("Skip for now")),
+        Assert.assertTrue(generic.isDisplayedPublic(generic.byTextContainsPublic("Payment Methods")),
                 "Payment method screen not shown");
     }
 
@@ -489,7 +491,7 @@ public class RegistrationSteps {
     }
 
     private void ensureOnPaymentScreen() {
-        if (generic.isDisplayedPublic(generic.byTextPublic("Skip for now"))) {
+        if (generic.isDisplayedPublic(generic.byTextContainsPublic("Payment Methods"))) {
             return;
         }
         // Real order is Terms -> Referral -> Payment (see ensureOnReferralScreen note) — skip
@@ -533,7 +535,7 @@ public class RegistrationSteps {
             return;
         }
         ensureOnPaymentScreen();
-        generic.tapTextPublic("Skip for now");
+        generic.tapTextPublic("Skip"); // CONFIRMED 2026-08-13: real label is "Skip", not "Skip for now"
         i_should_be_navigated_to_welcome_screen();
     }
 
