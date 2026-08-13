@@ -119,6 +119,20 @@ public class BasePage {
         waitForClickable(locator).click();
     }
 
+    // CONFIRMED 2026-08-13: some buttons are disabled behind a countdown longer than the default
+    // 20s wait (e.g. OTP screen's "Resend code" — genuinely disabled for ~29s). A one-off longer
+    // wait for those specific taps, rather than raising the default for everything.
+    protected void tap(By locator, java.time.Duration timeout) {
+        hideKeyboardIfShown();
+        new org.openqa.selenium.support.ui.WebDriverWait(driver, timeout)
+                .until(ExpectedConditions.elementToBeClickable(locator))
+                .click();
+    }
+
+    protected void tapText(String visibleText, java.time.Duration timeout) {
+        tap(byText(visibleText), timeout);
+    }
+
     private void hideKeyboardIfShown() {
         try {
             if (driver instanceof HasOnScreenKeyboard hasKeyboard && hasKeyboard.isKeyboardShown()) {
@@ -187,6 +201,10 @@ public class BasePage {
 
     public void tapTextPublic(String visibleText) {
         tapText(visibleText);
+    }
+
+    public void tapTextPublic(String visibleText, java.time.Duration timeout) {
+        tapText(visibleText, timeout);
     }
 
     public void typeIntoPublic(By locator, String value) {

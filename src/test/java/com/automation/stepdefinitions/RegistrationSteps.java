@@ -254,9 +254,13 @@ public class RegistrationSteps {
                 "Profile setup (name entry) screen not shown");
     }
 
+    // CONFIRMED 2026-08-13: real incorrect-OTP error is "Invalid verification code. Please try
+    // again." — the feature file's guessed "Invalid verification code" was a correct prefix, but
+    // needs contains-match since the exact string has more text appended. Same fix pattern as
+    // CommonSteps#i_should_see_validation_error.
     @Then("I should see an error message {string}")
     public void i_should_see_an_error_message(String message) {
-        Assert.assertTrue(generic.isDisplayedPublic(generic.byTextPublic(message)),
+        Assert.assertTrue(generic.isDisplayedPublic(generic.byTextContainsPublic(message)),
                 "Expected error message: " + message);
     }
 
@@ -270,10 +274,15 @@ public class RegistrationSteps {
         // Backend assertion.
     }
 
+    // CONFIRMED 2026-08-13: no persistent "code resent" text/banner appears on screen — either
+    // it's a transient toast already gone by the time this step runs, or the countdown resetting
+    // is the only feedback the design gives. Using the countdown restart as the observable proof
+    // of a successful resend instead of hunting for text that isn't there.
     @Then("I should see a confirmation that the code was resent")
     public void i_should_see_resend_confirmation() {
-        Assert.assertTrue(generic.isDisplayedPublic(generic.byTextContainsPublic("resent")),
-                "Expected resend confirmation");
+        Assert.assertTrue(generic.isDisplayedPublic(generic.byTextContainsPublic("Resend code (0:2"))
+                        || generic.isDisplayedPublic(generic.byTextContainsPublic("Resend code (0:1")),
+                "Expected the resend cooldown to have restarted");
     }
 
     @Then("I should see an error message indicating the code has expired")
@@ -284,8 +293,17 @@ public class RegistrationSteps {
 
     @Then("I should be prompted to request a new code")
     public void i_should_be_prompted_for_new_code() {
-        Assert.assertTrue(generic.isDisplayedPublic(generic.byTextPublic("Resend Code")),
+        // The button is visible (just disabled behind its countdown) even before the cooldown
+        // expires, so a plain visibility check doesn't need the long-wait treatment below.
+        Assert.assertTrue(generic.isDisplayedPublic(generic.byTextContainsPublic("Resend code")),
                 "Expected prompt to request a new code");
+    }
+
+    @When("I wait for the resend cooldown to expire and tap {string}")
+    public void i_wait_for_resend_cooldown_and_tap(String label) {
+        // CONFIRMED 2026-08-13: disabled behind a ~29s countdown ("Resend code (0:29)") — the
+        // default 20s explicit wait isn't long enough, so this uses BasePage's longer-timeout tap.
+        generic.tapTextPublic(label, java.time.Duration.ofSeconds(35));
     }
 
     // ---------- Name / Email / Referral / Terms / Payment ----------

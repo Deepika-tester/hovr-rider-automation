@@ -63,9 +63,12 @@ Feature: Rider Registration
     Then I should see an error message "Invalid verification code"
     And I should remain on the OTP verification screen
 
+  # CONFIRMED 2026-08-13: real button text is "Resend code" (lowercase c, was "Resend Code"),
+  # and it's genuinely disabled behind a ~29s countdown ("Resend code (0:29)") before becoming
+  # tappable — needs its own step (not the generic "I tap") for a long-enough wait.
   Scenario: Resend OTP code
     Given I am on the OTP verification screen
-    When I tap "Resend Code"
+    When I wait for the resend cooldown to expire and tap "Resend code"
     Then a new OTP should be sent to my phone number
     And I should see a confirmation that the code was resent
 
