@@ -33,7 +33,7 @@ Feature: Rider Registration
     When I select country code "+1"
     And I enter phone number "123"
     And I tap "Continue"
-    Then I should see a validation error "Invalid phone number"
+    Then I should see a validation error "couldn't use this number"
 
   Scenario: Enter phone number from unsupported region
     Given I am on the phone number entry screen

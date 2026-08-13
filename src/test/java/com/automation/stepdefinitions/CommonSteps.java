@@ -43,9 +43,14 @@ public class CommonSteps {
                 "Expected success confirmation");
     }
 
+    // Contains-match, not exact — error/validation copy is exactly the kind of text that gets
+    // tweaked without anyone updating every test. CONFIRMED 2026-08-13: the invalid-phone-format
+    // message is actually "Sorry, we couldn't use this number. Please ensure it's correct for
+    // your region." — the feature file's Gherkin now quotes a matching substring, not the
+    // originally-guessed "Invalid phone number".
     @Then("I should see a validation error {string}")
     public void i_should_see_validation_error(String message) {
-        Assert.assertTrue(ui.isDisplayedPublic(ui.byTextPublic(message)),
+        Assert.assertTrue(ui.isDisplayedPublic(ui.byTextContainsPublic(message)),
                 "Expected validation error: " + message);
     }
 
