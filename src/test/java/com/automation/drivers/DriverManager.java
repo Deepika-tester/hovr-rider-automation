@@ -115,6 +115,8 @@ public class DriverManager {
         String[] permissions = {
                 "android.permission.ACCESS_FINE_LOCATION",
                 "android.permission.ACCESS_COARSE_LOCATION",
+                "android.permission.ACCESS_BACKGROUND_LOCATION", // driver app's "Background Location Required" dialog loops without it
+                "android.permission.CAMERA",
                 "android.permission.POST_NOTIFICATIONS"
         };
         String appPackage = ConfigReader.get("appPackage", "");

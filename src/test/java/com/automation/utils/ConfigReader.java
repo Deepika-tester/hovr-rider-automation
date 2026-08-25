@@ -7,7 +7,7 @@ import java.util.Properties;
 /**
  * Loads the platform-specific config.properties once and exposes typed getters.
  *
- * Platform is selected via -Dplatform=android|ios|emulator (or the PLATFORM env var as a
+ * Platform is selected via -Dplatform=android|ios|emulator|driver|driver-emulator (or the PLATFORM env var as a
  * fallback), defaulting to "android" so existing invocations keep working
  * unchanged. Each platform's file lives at src/test/resources/config/<file>.
  */
@@ -22,6 +22,8 @@ public class ConfigReader {
         String fileName = switch (platform) {
             case "ios" -> "ios.properties";
             case "emulator" -> "emulator.properties";
+            case "driver" -> "driver.properties";
+            case "driver-emulator" -> "driver-emulator.properties";
             default -> "config.properties";
         };
         String path = CONFIG_DIR + fileName;
