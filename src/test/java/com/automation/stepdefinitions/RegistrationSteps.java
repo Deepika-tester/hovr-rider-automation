@@ -389,9 +389,22 @@ public class RegistrationSteps {
         i_should_be_navigated_to_email_screen();
     }
 
+    // CONFIRMED 2026-08-25 on a real device (see DriverRegistrationSteps.i_enter_email): the
+    // backend enforces email uniqueness across registrations, same landmine as the fixed-phone-
+    // number bug fixed via uniqueTestPhoneNumber() above. Inject a unique "+timestamp" tag into
+    // the local part so repeated runs don't collide on "account with this email already exists".
+    // Values with no "@" (e.g. "not-an-email" in the invalid-format scenario) pass through
+    // unchanged -- those never submit successfully, so uniqueness doesn't matter for them.
     @When("I enter email {string}")
     public void i_enter_email(String email) {
-        generic.typeIntoPublic(By.className("android.widget.EditText"), email);
+        generic.typeIntoPublic(By.className("android.widget.EditText"), uniqueTestEmail(email));
+    }
+
+    private static String uniqueTestEmail(String email) {
+        int atIndex = email.indexOf('@');
+        return atIndex < 0
+                ? email
+                : email.substring(0, atIndex) + "+" + (System.currentTimeMillis() % 100_000) + email.substring(atIndex);
     }
 
     // CONFIRMED 2026-08-12 on a real device — TWO surprises vs. what the feature file assumes:
@@ -466,7 +479,7 @@ public class RegistrationSteps {
             return;
         }
         ensureOnEmailEntryScreen();
-        i_enter_email("jane.doe@example.com"); // VERIFY: arbitrary placeholder
+        i_enter_email("jane.doe@example.com"); // VERIFY: arbitrary placeholder, made unique by i_enter_email above
         generic.tapTextPublic("Continue");
         i_should_be_navigated_to_terms_screen();
     }
