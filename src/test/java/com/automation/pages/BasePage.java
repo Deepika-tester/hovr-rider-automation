@@ -215,6 +215,10 @@ public class BasePage {
         return isDisplayed(locator);
     }
 
+    public List<WebElement> findAllPublic(By locator) {
+        return findAll(locator);
+    }
+
     public AppiumDriver driverPublic() {
         return driver;
     }

@@ -1,5 +1,6 @@
 package com.automation.stepdefinitions;
 
+import com.automation.drivers.DriverManager;
 import com.automation.pages.*;
 import com.automation.utils.ConfigReader;
 import io.appium.java_client.AppiumBy;
@@ -106,27 +107,81 @@ public class RegistrationSteps {
         i_should_see_the_phone_number_entry_screen();
     }
 
+    // The clickable flag/country-code button has no text/content-desc of its own (just an emoji
+    // flag glyph that changes with selection, so it can't be matched by fixed text) — but it's a
+    // reliable structural sibling of the phone-number EditText: same parent row, one level up.
+    private static final By COUNTRY_CODE_SELECTOR =
+            By.xpath("//android.widget.EditText/parent::*/preceding-sibling::*[@clickable='true'][1]");
+
     @When("I select country code {string}")
     public void i_select_country_code(String code) {
-        // CONFIRMED 2026-08-10: default is already Canada/+1, so every actual usage in this
-        // feature file (all three are "+1") is a same-code no-op — skip opening the picker
-        // entirely rather than risk leaving it open (confirmed real bug: it's a full-screen
-        // alphabetical list with no exposed search EditText in the accessibility tree despite
-        // showing a "Search country" placeholder, so a picker left open with the wrong country
-        // typed/tapped blocks the rest of the screen, including "Continue"). Selecting a
-        // DIFFERENT country isn't implemented — would need the search field solved first.
+        // CONFIRMED 2026-08-10: default is already Canada/+1, so a same-code no-op is common.
         if (generic.isDisplayedPublic(generic.byTextPublic(code))) {
             return;
         }
+        if ("+91".equals(code)) {
+            selectIndiaCountryCode();
+            return;
+        }
         throw new UnsupportedOperationException(
-                "Selecting a country code other than the default (+1) is not yet implemented — "
-                        + "the picker's search field isn't exposed in the accessibility tree.");
+                "Selecting country code " + code + " is not yet implemented — only +91 (India) has "
+                        + "a confirmed working selection path (see selectIndiaCountryCode).");
+    }
+
+    // CONFIRMED 2026-09-17 on a real device (dev build hovr-rider-dev-v6.3.0+586): the OTP
+    // staging bypass ("111111") is REJECTED for every +1 (Canada/default) number tried — 3
+    // different numbers, both the prod build (v6.3.0+579/582, "Sorry, we couldn't verify this
+    // code") and this dev build (generic "Something went wrong" backend error). Switching to
+    // India (+91) fixed it immediately, and not just for one whitelisted number — 2 different
+    // +91 numbers (one real, one made up) both passed. So the bypass is scoped to +91, not to a
+    // specific number. This build's country picker also has a real "Search country" EditText
+    // (an earlier prod build (v581) didn't expose one at all in the accessibility tree, which is
+    // why country selection used to be entirely unimplemented — see the old
+    // UnsupportedOperationException this replaces).
+    private void selectIndiaCountryCode() {
+        generic.tapPublic(COUNTRY_CODE_SELECTOR);
+        // CONFIRMED 2026-09-17: opening the picker does NOT remove the original phone-number
+        // EditText from the tree -- it's still there (now hidden behind the picker) and sorts
+        // FIRST in document order, so a plain By.className(EditText) lookup grabs that invisible
+        // field instead of the real "Search country" box, and sendKeys silently lands nowhere
+        // visible (confirmed via a failed automated run: search stayed empty, list unfiltered).
+        // The real search field is the LAST EditText on screen at this point -- but it also
+        // mounts ASYNCHRONOUSLY after the flag-button tap, so grabbing EditTexts immediately can
+        // still see only the one original field; a second failed run confirmed that races into
+        // clicking/typing into the wrong (single) field and collapsing the picker instead of
+        // searching. Explicitly wait for a second EditText to exist before trusting "the last
+        // one" is the search box.
+        java.util.List<org.openqa.selenium.WebElement> editTexts =
+                new org.openqa.selenium.support.ui.WebDriverWait(generic.driverPublic(), java.time.Duration.ofSeconds(10))
+                        .until(d -> {
+                            java.util.List<org.openqa.selenium.WebElement> found =
+                                    generic.findAllPublic(By.className("android.widget.EditText"));
+                            return found.size() >= 2 ? found : null;
+                        });
+        org.openqa.selenium.WebElement searchField = editTexts.get(editTexts.size() - 1);
+        searchField.click();
+        searchField.sendKeys("India");
+        // CONFIRMED 2026-09-17: generic.tapTextPublic("India") (byText -> @text='India' OR
+        // @content-desc='India', any element) is ambiguous here -- once "India" is typed, the
+        // search EditText's OWN @text is also now literally "India" (it mirrors typed content),
+        // and it sorts before the results list in document order, so the generic lookup re-taps
+        // the search field itself and leaves the picker open (confirmed via a failed automated
+        // run: phone number then got typed into the still-open original field). Scope the
+        // locator to TextView specifically -- the search box is an EditText, so this can only
+        // match the actual "India" result row, not the query that produced it.
+        generic.tapPublic(By.xpath("//android.widget.TextView[@text='India']"));
     }
 
     @When("I enter phone number {string}")
     public void i_enter_phone_number(String phoneNumber) {
         // CONFIRMED 2026-08-10: only one EditText on this screen (the mobile number field).
-        generic.waitForPublic(By.className("android.widget.EditText")).sendKeys(phoneNumber);
+        // CONFIRMED 2026-09-18: clear first -- same stale-state class of bug as the OTP field
+        // (see enterOtpCode's javadoc). A number left over from an earlier scenario/failed run
+        // would otherwise get a fresh number appended onto it instead of replaced.
+        org.openqa.selenium.WebElement field =
+                generic.waitForPublic(By.className("android.widget.EditText"));
+        field.clear();
+        field.sendKeys(phoneNumber);
     }
 
     @When("I tap {string} without entering a phone number")
@@ -173,26 +228,46 @@ public class RegistrationSteps {
     }
 
     private void ensureOnOtpScreen() {
-        if (generic.isDisplayedPublic(generic.byTextContainsPublic("digit code sent"))) {
+        // CONFIRMED 2026-09-18 on a real device: this short-circuit used to fire on the OTP
+        // screen being shown at all, with no regard for WHETHER it's a clean, fresh session --
+        // "OTP code expires" (which deliberately submits a wrong code and expects rejection,
+        // never advancing) leaves the app sitting right here with an error banner up. The next
+        // scenario to call this then reused that same already-rejected-once session instead of
+        // getting a fresh phone number + OTP request, and got "Invalid verification code" on the
+        // real bypass code too (repro'd consistently: whichever scenario runs immediately after
+        // "OTP code expires" in the suite fails here, in isolation it passes every time). Only
+        // treat this as "already there" when there's no error banner -- otherwise fall through,
+        // which forces a full app reset via ensureOnPhoneEntryScreen -> ensureOnLandingPage
+        // (we're not on the phone-entry screen either, so that path resets to a clean slate) and
+        // a genuinely fresh number.
+        if (generic.isDisplayedPublic(generic.byTextContainsPublic("digit code sent"))
+                && !generic.isDisplayedPublic(generic.byTextContainsPublic("Invalid verification code"))
+                && !generic.isDisplayedPublic(generic.byTextContainsPublic("couldn't verify this code"))
+                && !generic.isDisplayedPublic(generic.byTextContainsPublic("Something went wrong"))) {
             return;
         }
         ensureOnPhoneEntryScreen();
-        // Country code already defaults to +1 on this screen (confirmed 2026-08-10) — no need to
-        // reselect it. MUST be a fresh number each run, not a fixed one: confirmed 2026-08-13
-        // against the real staging backend that accepting Terms of Service actually creates the
-        // account server-side, so replaying a previously-completed number just logs straight
-        // into the existing account (ride home screen) instead of reaching name/email/etc. —
-        // that's exactly what broke "Skip payment method during registration" after an earlier
-        // run had already completed registration with the old hardcoded "4165551234".
+        // CONFIRMED 2026-09-17: must be India (+91), not the +1 default — see
+        // selectIndiaCountryCode's javadoc for why. MUST also be a fresh number each run, not a
+        // fixed one: confirmed 2026-08-13 against the real staging backend that accepting Terms
+        // of Service actually creates the account server-side, so replaying a previously-
+        // completed number just logs straight into the existing account (ride home screen)
+        // instead of reaching name/email/etc. — that's exactly what broke "Skip payment method
+        // during registration" after an earlier run had already completed registration with the
+        // old hardcoded "4165551234".
+        selectIndiaCountryCode();
         i_enter_phone_number(uniqueTestPhoneNumber());
         generic.tapTextPublic("Continue");
         i_should_be_navigated_to_otp_screen();
     }
 
-    // "555" is the North American fictional-use exchange code (never assigned to a real
-    // subscriber), so this can't collide with a real number. The last 4 digits change every run.
+    // CONFIRMED 2026-09-17: switched from the old North American "416555xxxx" pattern (555 is
+    // the fictional-use exchange code) since the OTP bypass now requires India (+91) — see
+    // selectIndiaCountryCode's javadoc. There's no equivalent always-fictional prefix block for
+    // Indian mobile numbers to anchor on, but the bypass doesn't require a real subscriber, just
+    // a fresh 10-digit number starting with a valid mobile prefix (6-9) each run.
     private static String uniqueTestPhoneNumber() {
-        return "416555" + String.format("%04d", System.currentTimeMillis() % 10_000);
+        return "9" + String.format("%09d", System.currentTimeMillis() % 1_000_000_000L);
     }
 
     @Then("I should be navigated to the {string} screen")
@@ -224,14 +299,45 @@ public class RegistrationSteps {
     // EditText on this screen (see i_should_be_navigated_to_otp_screen above).
     private static final String STAGING_BYPASS_OTP = "111111";
 
+    // CONFIRMED 2026-09-18 on a real device: this field can already contain 6 characters when
+    // this runs -- e.g. "OTP code expires" leaves "123456" sitting in it, and since that scenario
+    // never advances past this screen (expects an error, not navigation) and the app isn't force-
+    // reset between scenarios (noReset=true, ensureOnOtpScreen's short-circuit check only looks
+    // for the OTP screen being shown, not for a clean field), the NEXT scenario to reach this
+    // screen inherits that stale, already-full text. A bare sendKeys() then appends onto a
+    // maxLength=6 field and silently does nothing, leaving "123456" in place and the bypass code
+    // never actually entered (confirmed via a failed automated run: "Enter rider first and last
+    // name" got "Invalid verification code" with visibly stale "123456" in the boxes). Clear
+    // first, same as typeInto() does elsewhere, so this is safe regardless of what a prior
+    // scenario left behind.
+    // CONFIRMED 2026-09-18 on a real device: even with a clean/cleared field, entering the code
+    // and letting the caller immediately proceed (checking for navigation / tapping Continue)
+    // intermittently gets "Invalid verification code" -- on the SAME screen, a manual adb
+    // `input text` of the identical code, always followed by a human-paced pause before the next
+    // action, succeeded every single time (5+ tries, multiple fresh numbers). The difference
+    // isn't the code or the field, it's the missing settle time for Compose's own validation to
+    // catch up before something else touches this screen. A short pause after entering it fixes
+    // this without needing to guess at what's racing what internally.
+    private void enterOtpCode(String code) {
+        org.openqa.selenium.WebElement field =
+                generic.waitForPublic(By.className("android.widget.EditText"));
+        field.clear();
+        field.sendKeys(code);
+        try {
+            Thread.sleep(1500);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
     @When("I enter the correct 6-digit OTP code")
     public void i_enter_the_correct_otp_code() {
-        generic.waitForPublic(By.className("android.widget.EditText")).sendKeys(STAGING_BYPASS_OTP);
+        enterOtpCode(STAGING_BYPASS_OTP);
     }
 
     @When("I enter an incorrect OTP code {string}")
     public void i_enter_an_incorrect_otp_code(String code) {
-        generic.waitForPublic(By.className("android.widget.EditText")).sendKeys(code);
+        enterOtpCode(code);
     }
 
     @When("I enter the expired OTP code")
@@ -240,7 +346,7 @@ public class RegistrationSteps {
         // here — this scenario needs a genuinely expired code, which requires waiting out a real
         // OTP's 5-minute window (or a staging fixture that seeds one pre-expired). Placeholder
         // "123456" left as-is; this scenario is not actually verified yet.
-        generic.waitForPublic(By.className("android.widget.EditText")).sendKeys("123456");
+        enterOtpCode("123456");
     }
 
     @Then("the OTP should be verified successfully via the IAM service")
@@ -330,7 +436,16 @@ public class RegistrationSteps {
     private static final By PREFERRED_NAME_FIELD = By.xpath("//android.widget.EditText[@hint='Optional']");
 
     private void ensureOnNameEntryScreen() {
-        if (generic.isDisplayedPublic(FIRST_NAME_FIELD)) {
+        // CONFIRMED 2026-09-18: same class of bug as ensureOnOtpScreen's short-circuit fix above
+        // -- "Enter name with empty first name" deliberately triggers a validation error and
+        // never advances, so the app is left sitting right here with that error banner up. The
+        // next scenario to reach this screen must NOT treat that as "already there": it's a
+        // dirty state (empty first name, error shown), and reusing it broke the following
+        // scenario in a real run (typing into the name fields on top of that error state made
+        // the last-name field unreachable within the normal wait timeout). Fall through to a
+        // fresh chain instead when the error is visible.
+        if (generic.isDisplayedPublic(FIRST_NAME_FIELD)
+                && !generic.isDisplayedPublic(generic.byTextContainsPublic("first name"))) {
             return;
         }
         ensureOnOtpScreen();
@@ -379,7 +494,12 @@ public class RegistrationSteps {
     }
 
     private void ensureOnEmailEntryScreen() {
-        if (generic.isDisplayedPublic(generic.byTextContainsPublic("your email"))) {
+        // CONFIRMED 2026-09-18: same class of bug as ensureOnNameEntryScreen/ensureOnOtpScreen's
+        // short-circuit fixes above -- "Enter invalid email format" deliberately triggers a
+        // validation error and never advances, so don't treat this screen being shown WITH that
+        // error still up as "already there"; fall through to a fresh chain instead.
+        if (generic.isDisplayedPublic(generic.byTextContainsPublic("your email"))
+                && !generic.isDisplayedPublic(generic.byTextContainsPublic("valid email address"))) {
             return;
         }
         ensureOnNameEntryScreen();
@@ -428,6 +548,14 @@ public class RegistrationSteps {
     // your driver" screen" etc.) via Cucumber's global step registry.
     @Given("I am on the {string} screen")
     public void i_am_on_the_named_screen(String screenName) {
+        // CONFIRMED 2026-09-21: as a plain assertion this never NAVIGATED to the referral screen,
+        // so all three referral scenarios failed standalone. Special-cased to the real
+        // self-navigating chain (Terms -> "Agree and continue" -> Referral); every other screen
+        // name still falls back to the plain assertion (shared with rider_booking.feature etc.).
+        if ("Do you have a referral code?".equals(screenName)) {
+            ensureOnReferralScreen();
+            return;
+        }
         Assert.assertTrue(generic.isDisplayedPublic(generic.byTextContainsPublic(screenName)),
                 "Expected to be on screen: " + screenName);
     }
@@ -610,9 +738,7 @@ public class RegistrationSteps {
 
     @Given("there is no network connectivity")
     public void there_is_no_network_connectivity() {
-        // Real-device network toggling requires adb (e.g. `adb shell svc wifi disable` +
-        // `adb shell svc data disable`), not exposed via Appium options here — add as a
-        // bash/adb pre-step if this scenario needs to run for real.
+        DriverManager.setNetworkEnabled(false);
     }
 
     @When("I enter a valid phone number and tap {string}")
@@ -629,8 +755,14 @@ public class RegistrationSteps {
 
     @Then("I should be able to retry when connectivity is restored")
     public void i_should_be_able_to_retry() {
-        Assert.assertTrue(generic.isDisplayedPublic(generic.byTextPublic("Continue")),
-                "Expected retry option after connectivity restored");
+        DriverManager.setNetworkEnabled(true);
+        // Real device needs a few seconds to reacquire wifi/data after the radios come back up;
+        // the longer timeout absorbs that instead of a fixed sleep. Asserting the retry actually
+        // navigates to the OTP screen (not just that "Continue" is visible) is the real check --
+        // the button stays on screen while offline too, so visibility alone wouldn't prove retry
+        // works.
+        generic.tapTextPublic("Continue", java.time.Duration.ofSeconds(20));
+        i_should_be_navigated_to_otp_screen();
     }
 
     @Given("I have completed OTP verification")

@@ -39,6 +39,11 @@ public class Hooks {
             byte[] screenshot = DriverManager.getDriver().getScreenshotAs(OutputType.BYTES);
             scenario.attach(screenshot, "image/png", scenario.getName());
         }
+        // Defensive, unconditional: the "no network connectivity" scenario (see
+        // RegistrationSteps) disables wifi/data via adb. If it fails partway — before its own
+        // retry assertion re-enables them — the device would stay offline for every scenario
+        // after it. Always restoring here is a no-op cost when nothing was ever disabled.
+        DriverManager.setNetworkEnabled(true);
         DriverManager.quitDriver();
     }
 }

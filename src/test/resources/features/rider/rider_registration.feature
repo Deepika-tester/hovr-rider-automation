@@ -96,11 +96,16 @@ Feature: Rider Registration
     And I tap "Continue"
     Then I should see a validation error for the first name field
 
+  # CONFIRMED 2026-09-17 on a real device: real order is Email -> Terms -> Referral (not
+  # Email -> Referral as this scenario previously asserted) -- matches the real order already
+  # noted in RegistrationSteps' i_should_be_navigated_to_terms_screen javadoc, just never
+  # actually reflected here since the suite couldn't reach this far until the India (+91) OTP
+  # bypass fix (see RegistrationSteps#selectIndiaCountryCode).
   Scenario: Enter rider email address
     Given I am on the rider email entry screen
     When I enter email "kerry.kim@abcd.com"
     And I tap "Continue"
-    Then I should be navigated to the referral code screen
+    Then I should be navigated to the terms and policy screen
 
   Scenario: Enter invalid email format
     Given I am on the rider email entry screen
@@ -113,7 +118,7 @@ Feature: Rider Registration
   Scenario: Skip referral code entry
     Given I am on the "Do you have a referral code?" screen
     When I tap "Skip" or "No"
-    Then I should be navigated to the terms and policy screen
+    Then I should be navigated to the payment method screen
 
   Scenario: Enter a valid referral code
     Given I am on the "Do you have a referral code?" screen
@@ -127,7 +132,7 @@ Feature: Rider Registration
     Given I am on the "Do you have a referral code?" screen
     When I enter referral code "INVALID123"
     And I tap "Redeem Code"
-    Then I should see an error "Invalid referral code"
+    Then I should see an error "Failed to redeem referral code"
 
   # --- TERMS AND POLICY ---
 
@@ -135,7 +140,7 @@ Feature: Rider Registration
     Given I am on the terms and policy screen
     When I review the terms of service
     And I tap "Agree and continue"
-    Then I should be navigated to the payment method screen
+    Then I should be navigated to the referral code screen
 
   Scenario: Decline terms and conditions
     Given I am on the terms and policy screen
