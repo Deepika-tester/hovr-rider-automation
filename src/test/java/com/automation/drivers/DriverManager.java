@@ -39,9 +39,7 @@ public class DriverManager {
                 grantAndroidRuntimePermissions();
             }
 
-            AppiumDriver driver = "iOS".equalsIgnoreCase(platformName)
-                    ? new IOSDriver(appiumUrl, buildIosOptions())
-                    : new AndroidDriver(appiumUrl, buildAndroidOptions());
+            AppiumDriver driver = createSessionWithRetry(appiumUrl, platformName);
 
             driver.manage().timeouts().implicitlyWait(
                     Duration.ofSeconds(ConfigReader.getInt("implicitWaitSeconds")));
@@ -50,6 +48,50 @@ public class DriverManager {
         } catch (MalformedURLException e) {
             throw new RuntimeException("Invalid Appium server URL in config.properties", e);
         }
+    }
+
+    // CONFIRMED 2026-09-18 on this same physical device, again: mid-run USB/adb dropouts are a
+    // real, recurring hardware issue here, not a code problem (adb devices shows the device gone
+    // then back healthy on its own, transport_id changing each time). Without this retry, one
+    // blip during ANY scenario's session creation cascades into every remaining scenario in the
+    // batch failing with SessionNotCreatedException, since each scenario's @Before tries to
+    // create a brand new session (see Hooks) and none of them recovered on their own. Three
+    // attempts with an `adb reconnect` and a pause between each gives the device roughly the
+    // window it takes to come back on its own, without letting a truly-disconnected device
+    // (unplugged, etc.) hang a scenario forever.
+    private static AppiumDriver createSessionWithRetry(URL appiumUrl, String platformName) {
+        final int maxAttempts = 3;
+        RuntimeException lastFailure = null;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                return "iOS".equalsIgnoreCase(platformName)
+                        ? new IOSDriver(appiumUrl, buildIosOptions())
+                        : new AndroidDriver(appiumUrl, buildAndroidOptions());
+            } catch (RuntimeException e) {
+                lastFailure = e;
+                if (attempt == maxAttempts) {
+                    break;
+                }
+                String udid = ConfigReader.get("udid", "");
+                if (!udid.isBlank()) {
+                    try {
+                        new ProcessBuilder("adb", "-s", udid, "reconnect")
+                                .redirectErrorStream(true)
+                                .start()
+                                .waitFor(10, java.util.concurrent.TimeUnit.SECONDS);
+                    } catch (Exception ignored) {
+                        // Best-effort — fall through to the sleep/retry regardless.
+                    }
+                }
+                try {
+                    Thread.sleep(20_000);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
+        throw lastFailure;
     }
 
     // Belt-and-suspenders alongside UiAutomator2Options#setAutoGrantPermissions: that capability
@@ -85,6 +127,17 @@ public class DriverManager {
         runAdbShell("pm", "clear", appPackage);
         grantAndroidRuntimePermissions(); // pm clear wipes previously-granted permissions too
         ((io.appium.java_client.InteractsWithApps) getDriver()).activateApp(appPackage);
+    }
+
+    // Backs the "Registration with network timeout during OTP request" scenario — Appium has no
+    // capability for this, so it's plain adb like resetAppToLoggedOutState above. Toggles both
+    // radios since the device may be on wifi or mobile data depending on how it's provisioned;
+    // `svc wifi`/`svc data` need no root and survive app restarts, unlike airplane-mode content
+    // settings which need a broadcast to actually take effect.
+    public static void setNetworkEnabled(boolean enabled) {
+        String state = enabled ? "enable" : "disable";
+        runAdbShell("svc", "wifi", state);
+        runAdbShell("svc", "data", state);
     }
 
     private static void runAdbShell(String... shellArgs) {
