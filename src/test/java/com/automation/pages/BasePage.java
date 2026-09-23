@@ -6,6 +6,8 @@ import io.appium.java_client.AppiumDriver;
 import io.appium.java_client.HasOnScreenKeyboard;
 import io.appium.java_client.HidesKeyboard;
 import io.appium.java_client.android.AndroidDriver;
+import io.appium.java_client.android.nativekey.AndroidKey;
+import io.appium.java_client.android.nativekey.KeyEvent;
 import org.openqa.selenium.By;
 import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.WebElement;
@@ -190,10 +192,24 @@ public class BasePage {
         tap(byText(visibleText), timeout);
     }
 
+    // CONFIRMED 2026-09-23 on a real device via a clean A/B test (same screen, same filled-in
+    // state, only the dismiss method differed): Appium's own hideKeyboard() command does
+    // something more aggressive than a real user's keyboard-dismiss action on the Adyen
+    // card-entry dialog specifically — it closes the WHOLE dialog and discards every entered
+    // field, not just the keyboard. What a real user actually gets from a single system BACK
+    // press (equivalent to the nav bar's keyboard-dismiss chevron) hides ONLY the keyboard and
+    // leaves the dialog and its data intact. This had been misreported as an app bug before this
+    // was root-caused — it's specific to Appium's hideKeyboard() implementation, not real user
+    // interaction, so a raw back-key press is used here instead to avoid the false positive
+    // entirely (and matches real usage more closely everywhere else too, not just this dialog).
     private void hideKeyboardIfShown() {
         try {
             if (driver instanceof HasOnScreenKeyboard hasKeyboard && hasKeyboard.isKeyboardShown()) {
-                ((HidesKeyboard) driver).hideKeyboard();
+                if (driver instanceof AndroidDriver androidDriver) {
+                    androidDriver.pressKey(new KeyEvent(AndroidKey.BACK));
+                } else {
+                    ((HidesKeyboard) driver).hideKeyboard();
+                }
             }
         } catch (Exception e) {
             // Best-effort — never fail a tap over keyboard-visibility detection not being
