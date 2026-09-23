@@ -68,6 +68,17 @@ Feature: Driver Registration and Onboarding
     Then I should be authenticated
     And I should proceed to profile creation
 
+  # BUG (confirmed on a real device, flag to the backend/product team): there is NO phone number
+  # length/format validation before the app attempts to send an OTP -- even a bare 3-digit input
+  # ("123") is accepted, and the OTP screen renders "Enter the 6-digit code sent to you at
+  # +1123." In a real (non-staging) environment this number isn't dispatchable by the SMS
+  # provider (e.g. Twilio) at all, so the user would be stuck on the OTP screen having never
+  # actually received a code -- a real dead-end, not just a cosmetic issue. The "111111" staging
+  # bypass code masks this in testing since it always succeeds regardless of what was actually
+  # texted (or not texted) to the number. Same root issue as the region-blocking gap noted below:
+  # phone number acceptance has no validation of ANY kind (format, length, or region) before
+  # proceeding to OTP.
+  #
   # UNVERIFIED 2026-08-25: confirmed on a real device that a fake/invalid-looking number
   # ("1234567890") is accepted and proceeds straight to the OTP screen -- same finding as the
   # rider app's equivalent scenario. No region-blocking happens at registration time from the
@@ -105,10 +116,10 @@ Feature: Driver Registration and Onboarding
   #
   # CONFIRMED 2026-09-23 on a real device. Also confirmed, but NOT negative-testable since the
   # app doesn't block them at all (documented here rather than as a scenario that could never
-  # fail): a phone number with no format/length validation at all (a bare "123" is accepted and
-  # proceeds straight to the OTP screen -- see "Enter phone from unsupported region" above for
-  # the same finding from a different angle), and no required-field validation on either name
-  # field (leaving "Last name" empty still proceeds to the email screen).
+  # fail): a phone number with no format/length validation at all -- see the BUG note above
+  # "Enter phone from unsupported region" for why this is a real dead-end in production, not
+  # just a cosmetic gap -- and no required-field validation on either name field (leaving
+  # "Last name" empty still proceeds to the email screen).
 
   @profile-auth
   Scenario: Leave driver phone number empty
