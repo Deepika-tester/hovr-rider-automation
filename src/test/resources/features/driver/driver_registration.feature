@@ -101,6 +101,46 @@ Feature: Driver Registration and Onboarding
     Then my driver profile should be created
     And I should see the welcome screen
 
+  # --- NEGATIVE SCENARIOS (auth/profile) ---
+  #
+  # CONFIRMED 2026-09-23 on a real device. Also confirmed, but NOT negative-testable since the
+  # app doesn't block them at all (documented here rather than as a scenario that could never
+  # fail): a phone number with no format/length validation at all (a bare "123" is accepted and
+  # proceeds straight to the OTP screen -- see "Enter phone from unsupported region" above for
+  # the same finding from a different angle), and no required-field validation on either name
+  # field (leaving "Last name" empty still proceeds to the email screen).
+
+  @profile-auth
+  Scenario: Leave driver phone number empty
+    Given I am on the phone number entry screen
+    When I tap "Continue"
+    Then I should see a validation error "enter your phone number"
+
+  # Real error text is "Sorry, we couldn't verify this code. Please ensure it's correct and try
+  # again." -- matched apostrophe-free ("verify this code") since the app renders a curly
+  # apostrophe (same landmine as the rider suite's equivalent fix; see that project's notes).
+  @profile-auth
+  Scenario: Enter incorrect driver OTP
+    Given I am on the OTP verification screen
+    When I enter an incorrect OTP "000000"
+    Then I should see a validation error "verify this code"
+    And I should remain on the OTP verification screen
+
+  @profile-auth
+  Scenario: Leave driver email empty
+    Given I am on the driver email screen
+    When I tap "Continue"
+    Then I should see a validation error "Email field is empty"
+
+  # Real error text is "Sorry, we couldn't use this email. Please ensure you've entered it using
+  # the format name@email.com." -- same message as the rider app's equivalent, matched
+  # apostrophe-free for the same reason as above.
+  @profile-auth
+  Scenario: Enter invalid driver email format
+    Given I am on the driver email screen
+    When I enter email "not-an-email"
+    And I tap "Continue"
+    Then I should see a validation error "use this email"
 
   # --- ONBOARDING CHECKLIST (GTA marketplace) ---
   #
@@ -166,6 +206,56 @@ Feature: Driver Registration and Onboarding
     Given I have created my driver profile in the GTA marketplace
     And I am on the "Driver" document list
     When I tap the "Driver Selfie" document
+    And I capture a photo for the document
+    Then the document should show as submitted
+
+  # CONFIRMED 2026-09-23 on a real device: backing out of the gallery photo picker without
+  # selecting anything returns cleanly to the same document detail page -- no error, no crash,
+  # document stays unsubmitted (still shows "Upload"/"Camera", not "Submitted").
+  @profile-auth
+  Scenario: Cancel a document upload
+    Given I have created my driver profile in the GTA marketplace
+    And I am on the "Vehicle" document list
+    When I tap the "Vehicle Registration" document
+    And I cancel the photo picker without selecting a photo
+    Then the document should still show as required
+
+  # --- COMPLETE END-TO-END FLOW ---
+  #
+  # Ties the whole driver journey together in ONE continuous scenario (registration through
+  # every onboarding document), rather than the shortcut "Given I have created my driver profile
+  # in the GTA marketplace" the scenarios above use to jump straight to a post-registration
+  # state. Reuses every step already confirmed individually above and in the upload outline.
+  @profile-auth
+  Scenario: Complete driver registration and onboarding flow
+    Given my device location is set to the GTA marketplace
+    And I am on the driver landing page
+    When I tap "Get Started" or "Sign Up"
+    Then I should see the phone number entry screen
+    When I select country code "+1"
+    And I enter phone number "6475551234"
+    And I tap "Continue"
+    Then I should see the OTP verification screen
+    When I enter the correct OTP
+    Then I should proceed to profile creation
+    When I enter first name "Ahmad"
+    And I enter last name "Khan"
+    And I tap "Continue"
+    Then I should proceed to the email entry screen
+    When I enter email "ahmad.khan@email.com"
+    And I tap "Continue"
+    Then I should see the welcome screen
+    And I should see required document categories:
+      | category          |
+      | Driver             |
+      | Vehicle            |
+      | City Requirements  |
+    When I am on the "Vehicle" document list
+    And I tap the "Vehicle Registration" document
+    And I upload a photo for the document
+    Then the document should be uploaded successfully
+    When I am on the "Driver" document list
+    And I tap the "Driver Selfie" document
     And I capture a photo for the document
     Then the document should show as submitted
 

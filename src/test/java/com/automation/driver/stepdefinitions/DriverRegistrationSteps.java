@@ -113,6 +113,16 @@ public class DriverRegistrationSteps {
         // Backend-only assertion — not verifiable from the UI. See class javadoc.
     }
 
+    // Shared by every negative scenario's "Then I should see a validation error {string}" step
+    // (empty phone, empty email, invalid email, incorrect OTP) — all confirmed real error
+    // messages, matched apostrophe-free where the app renders a curly apostrophe (see the
+    // scenarios' own comments in the feature file for the exact confirmed wording).
+    @Then("I should see a validation error {string}")
+    public void i_should_see_a_validation_error(String message) {
+        Assert.assertTrue(generic.isDisplayedPublic(generic.byTextContainsPublic(message)),
+                "Expected validation error: " + message);
+    }
+
     @Then("I should see the OTP verification screen")
     public void i_should_see_the_otp_verification_screen() {
         Assert.assertTrue(generic.isDisplayedPublic(generic.byTextContainsPublic("digit code sent")),
@@ -143,6 +153,19 @@ public class DriverRegistrationSteps {
         otpField.click();
         otpField.clear();
         otpField.sendKeys(STAGING_BYPASS_OTP);
+    }
+
+    @When("I enter an incorrect OTP {string}")
+    public void i_enter_an_incorrect_otp(String code) {
+        WebElement otpField = generic.waitForPublic(By.className("android.widget.EditText"));
+        otpField.click();
+        otpField.clear();
+        otpField.sendKeys(code);
+    }
+
+    @Then("I should remain on the OTP verification screen")
+    public void i_should_remain_on_the_otp_verification_screen() {
+        i_should_see_the_otp_verification_screen();
     }
 
     @Then("I should be authenticated")
@@ -272,6 +295,15 @@ public class DriverRegistrationSteps {
         ensureOnGtaWelcomeDashboard();
     }
 
+    // Exposed as its own step for the "Complete driver registration and onboarding flow"
+    // scenario, which builds the whole journey up manually from the landing page rather than
+    // jumping straight to a post-registration state via ensureOnGtaWelcomeDashboard() above —
+    // it needs the mock applied BEFORE registering, same as that method does internally.
+    @Given("my device location is set to the GTA marketplace")
+    public void my_device_location_is_set_to_the_gta_marketplace() {
+        setMockLocationToToronto();
+    }
+
     private void ensureOnGtaWelcomeDashboard() {
         if (generic.isDisplayedPublic(generic.byTextContainsPublic("set up your account"))
                 && generic.isDisplayedPublic(generic.byTextContainsPublic("GTA"))) {
@@ -365,5 +397,23 @@ public class DriverRegistrationSteps {
     public void the_document_should_show_as_submitted() {
         Assert.assertTrue(generic.isDisplayedPublic(generic.byTextContainsPublic("Submitted")),
                 "Expected document status to show as submitted");
+    }
+
+    // CONFIRMED 2026-09-23 on a real device: backing out of the gallery photo picker (system
+    // back press) without selecting anything returns cleanly to the same document detail page —
+    // no error, no crash. Uses a raw back press rather than Appium's navigate().back(), since
+    // this needs to dismiss the PICKER activity specifically, not risk the app's own back-stack
+    // behavior (see the rider suite's Adyen-dialog notes for why a driver-level hideKeyboard/back
+    // call can behave unexpectedly on a screen it wasn't tested against).
+    @When("I cancel the photo picker without selecting a photo")
+    public void i_cancel_the_photo_picker_without_selecting_a_photo() {
+        generic.tapTextPublic("Upload");
+        generic.driverPublic().navigate().back();
+    }
+
+    @Then("the document should still show as required")
+    public void the_document_should_still_show_as_required() {
+        Assert.assertTrue(generic.isDisplayedPublic(generic.byTextPublic("Upload")),
+                "Expected to remain on the document detail page (upload not completed)");
     }
 }
