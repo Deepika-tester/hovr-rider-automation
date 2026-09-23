@@ -11,11 +11,13 @@ import org.openqa.selenium.WebElement;
 import org.testng.Assert;
 
 /**
- * Step definitions for src/test/resources/features/driver/driver_registration.feature —
- * auth/profile-creation portion only (Landing through Welcome). The onboarding
- * document-checklist scenarios further down that file are a separate, much
- * larger body of work (camera/file upload, S3 presigned URLs, background-check
- * flows) and are not covered here yet.
+ * Step definitions for src/test/resources/features/driver/driver_registration.feature — the
+ * auth/profile-creation flow (Landing through Welcome) AND the real, GTA-marketplace onboarding
+ * document checklist confirmed 2026-08-25 (see that scenario block's comments for how the
+ * checklist's real 15-document/3-category shape was found, superseding the file's original
+ * 25-scenario assumption). The remaining "not applicable" scenarios listed in a comment at the
+ * end of the feature file (S3 upload internals, training, banking, etc.) don't match anything in
+ * this app version and have no step definitions.
  *
  * Every locator/flow below is CONFIRMED against a real device 2026-08-25 —
  * unlike the rider suite's early days, nothing here is a guess pending
@@ -250,5 +252,96 @@ public class DriverRegistrationSteps {
         Assert.assertTrue(
                 generic.isDisplayedPublic(generic.byTextContainsPublic("set up your account")),
                 "Driver welcome/onboarding dashboard not shown");
+    }
+
+    // ---------- Onboarding checklist (GTA marketplace) ----------
+    //
+    // CONFIRMED 2026-08-25 on a real device: the onboarding checklist is MARKETPLACE-DEPENDENT,
+    // determined by device GPS at signup (not phone number country code) — India shows one
+    // document ("Vehicle Registration"), GTA shows the real 15-document/3-category checklist
+    // these steps exercise. GPS is mocked to Toronto via Appium's setLocation (Selenium's
+    // LocationContext interface, which AndroidDriver implements) rather than assuming whatever
+    // the physical test device's real location happens to be.
+
+    private static final double TORONTO_LATITUDE = 43.6532;
+    private static final double TORONTO_LONGITUDE = -79.3832;
+    private static final double TORONTO_ALTITUDE = 76;
+
+    @Given("I have created my driver profile in the GTA marketplace")
+    public void i_have_created_my_driver_profile_in_the_gta_marketplace() {
+        ensureOnGtaWelcomeDashboard();
+    }
+
+    private void ensureOnGtaWelcomeDashboard() {
+        if (generic.isDisplayedPublic(generic.byTextContainsPublic("set up your account"))
+                && generic.isDisplayedPublic(generic.byTextContainsPublic("GTA"))) {
+            return;
+        }
+        setMockLocationToToronto();
+        ensureOnEmailScreen();
+        i_enter_email("ahmad.khan@email.com");
+        generic.tapTextPublic("Continue");
+        i_should_see_the_welcome_screen();
+        Assert.assertTrue(generic.isDisplayedPublic(generic.byTextContainsPublic("GTA")),
+                "Expected GTA marketplace after mocking location to Toronto");
+    }
+
+    private void setMockLocationToToronto() {
+        ((io.appium.java_client.android.AndroidDriver) generic.driverPublic())
+                .setLocation(new org.openqa.selenium.html5.Location(
+                        TORONTO_LATITUDE, TORONTO_LONGITUDE, TORONTO_ALTITUDE));
+    }
+
+    @Then("I should see the HOVR onboarding document list")
+    public void i_should_see_the_hovr_onboarding_document_list() {
+        Assert.assertTrue(generic.isDisplayedPublic(generic.byTextContainsPublic("set up your account")),
+                "Onboarding document list not shown");
+    }
+
+    @And("I should see required document categories:")
+    public void i_should_see_required_document_categories(io.cucumber.datatable.DataTable table) {
+        for (java.util.Map<String, String> row : table.asMaps()) {
+            String category = row.get("category").strip();
+            Assert.assertTrue(generic.isDisplayedPublic(generic.byTextContainsPublic(category)),
+                    "Expected onboarding category: " + category);
+        }
+    }
+
+    // Category cards/document rows render their status on a second line (e.g. content-desc
+    // "Driver\nRequired · 6/6"), so an EXACT text match on just the category/document name would
+    // never hit — tapping via a contains() locator instead, same technique used for the Adyen
+    // card-payment button collision in the rider suite's BasePage notes.
+    @Given("I am on the {string} document list")
+    public void i_am_on_the_named_document_list(String category) {
+        ensureOnGtaWelcomeDashboard();
+        generic.tapPublic(generic.byTextContainsPublic(category));
+        Assert.assertTrue(generic.isDisplayedPublic(generic.byTextContainsPublic("submit the following")),
+                "Expected document list for category: " + category);
+    }
+
+    @When("I tap the {string} document")
+    public void i_tap_the_named_document(String document) {
+        generic.tapPublic(generic.byTextContainsPublic(document));
+        Assert.assertTrue(generic.isDisplayedPublic(generic.byTextPublic("Upload")),
+                "Expected document detail page for: " + document);
+    }
+
+    // CONFIRMED 2026-08-25 on a real device: "Upload" opens Android's system photo picker
+    // (com.google.android.photopicker) — selecting any existing photo and tapping "Done" is
+    // enough to complete the upload; the app doesn't validate photo CONTENT, just that one was
+    // provided. Selects whichever photo is first in the grid.
+    @When("I upload a photo for the document")
+    public void i_upload_a_photo_for_the_document() {
+        generic.tapTextPublic("Upload");
+        WebElement firstPhoto = generic.waitForPublic(
+                By.xpath("(//*[contains(@content-desc,'Photo taken')])[1]"));
+        firstPhoto.click();
+        generic.tapTextPublic("Done");
+    }
+
+    @Then("the document should be uploaded successfully")
+    public void the_document_should_be_uploaded_successfully() {
+        Assert.assertTrue(generic.isDisplayedPublic(generic.byTextContainsPublic("uploaded Successfully")),
+                "Expected upload success confirmation");
     }
 }

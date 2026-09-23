@@ -12,9 +12,19 @@ Feature: Driver Registration and Onboarding
   # Also confirmed: the "111111" staging bypass OTP that works on the rider app works here too,
   # and the app needs ACCESS_BACKGROUND_LOCATION granted before launch or a "Background Location
   # Required" in-app dialog gets stuck in a loop (neither NOT NOW nor CONTINUE dismisses it).
-  # Onboarding docs: Driver License, Vehicle Photos, Vehicle Insurance, Vehicle Inspection,
-  #                   Criminal Background Check, Vehicle For Hire Certificate, PTC License,
-  #                   Profile Photo, Driving Experience, HST/GST, Tax ID, Banking
+  # CONFIRMED 2026-08-25 on a real device: the onboarding checklist is MARKETPLACE-DEPENDENT,
+  # determined by device GPS at signup (not the phone number's country code) -- India shows just
+  # ONE document ("Vehicle Registration"); GTA (mocked here via Appium's setLocation to Toronto,
+  # 43.6532/-79.3832) shows a real 15-document checklist across three categories:
+  #   Driver (6): Driver's License, Driver Selfie, Driving Experience Verification,
+  #               Driver's License Back, city permit, workk permit [sic -- real app typo]
+  #   Vehicle (4): Vehicle Registration, Safety Inspection Certificate, Address, Vehicle Insurance
+  #   City Requirements (5): Background Check, Vehicle-For-Hire Certificate, PTC Number,
+  #                          Work Proof, city permit (shared with the Driver category's copy)
+  # "Membership" (also on the dashboard) is a benefits/subscription upsell page, not a document
+  # category. The original list below this comment (Driver License, Vehicle Photos, Vehicle
+  # Inspection, Criminal Background Check, Profile Photo, Driving Experience, PTC License, HST/
+  # GST, Tax ID, Banking) doesn't match any of the above -- superseded by the confirmed list.
   # Onboarding blocs: OnboardingEvent (GetChecklist, StartSession, SubmitDocument, StartUpload, CompleteUpload)
   # Services: IAM service + Driver service (ca.driver.api.prod.ridehovr.com)
 
@@ -91,203 +101,86 @@ Feature: Driver Registration and Onboarding
     Then my driver profile should be created
     And I should see the welcome screen
 
-  # --- ONBOARDING CHECKLIST ---
 
+  # --- ONBOARDING CHECKLIST (GTA marketplace) ---
+  #
+  # CONFIRMED 2026-08-25 on a real device: the scenarios below assume the GTA marketplace (see
+  # the feature-level comment above for why/how) since it's the one with a real, rich checklist
+  # to exercise -- India's single-document checklist isn't covered separately here.
+
+  @profile-auth
   Scenario: View onboarding document checklist
-    Given I have created my driver profile
-    When I navigate to the onboarding page
+    Given I have created my driver profile in the GTA marketplace
     Then I should see the HOVR onboarding document list
-    And I should see required documents:
-      | document                        | status   |
-      | Driver License                  | Required |
-      | Vehicle Photo and Details       | Required |
-      | Vehicle Insurance               | Required |
-      | Vehicle Inspection              | Required |
-      | Criminal Background Check       | Required |
-      | Profile Photo                   | Required |
-      | Driving Experience              | Required |
-    And I should see marketplace-specific documents based on my city
+    And I should see required document categories:
+      | category          |
+      | Driver             |
+      | Vehicle            |
+      | City Requirements  |
 
-  Scenario: Upload driver license
-    Given I am on the onboarding checklist
-    When I tap "Driver License"
-    Then I should see the driver license info page
-    When I scan or upload my driver license photo
-    And I confirm the license details
-    And I submit the document
-    Then a SubmitRequiredDocumentRequest should be sent
-    And the driver license status should change to "Submitted"
+  # CONFIRMED 2026-08-25 on a real device: every document's detail page has "Upload" (opens
+  # Android's system photo picker, com.google.android.photopicker) and "Camera" buttons, except
+  # Driver Selfie which only has "Upload" -- not exercised as a special case below since every
+  # row here uses the Upload/photo-picker path anyway. Selecting any existing photo and tapping
+  # "Done" is enough to complete an upload; the app doesn't validate photo CONTENT, just that one
+  # was provided. Confirmed the category's dashboard status changes from "Required · N/N" to
+  # "In progress · <submitted>/N" after a successful upload (Vehicle Registration verified this
+  # directly: "Required · 4/4" -> "In progress · 1/4").
+  @profile-auth
+  Scenario Outline: Upload a required onboarding document
+    Given I have created my driver profile in the GTA marketplace
+    And I am on the "<category>" document list
+    When I tap the "<document>" document
+    And I upload a photo for the document
+    Then the document should be uploaded successfully
 
-  Scenario: Upload vehicle photo and details
-    Given I am on the onboarding checklist
-    When I tap "Vehicle Photo and Details"
-    Then I should see the vehicle photo and details page
-    When I upload vehicle photos (front, back, side)
-    And I enter vehicle make, model, year, and color
-    And I enter the license plate number
-    And I submit
-    Then the vehicle details should be saved
+    # "Driver Selfie" deliberately excluded from these examples: CONFIRMED 2026-08-25 on a real
+    # device that its "Upload" button opens the live CAMERA directly for this one document,
+    # unlike every other document (where "Upload" opens the gallery photo picker this outline's
+    # steps automate) -- a genuine per-document UX difference, not a bug in these steps. Needs
+    # its own camera-capture automation (shutter button, etc.), not yet implemented/explored.
+    Examples:
+      | category           | document                          |
+      | Driver              | Driver's License                  |
+      | Driver              | Driving Experience Verification   |
+      | Driver              | Driver's License Back              |
+      | Driver              | city permit                       |
+      | Driver              | workk permit                      |
+      | Vehicle             | Vehicle Registration               |
+      | Vehicle             | Safety Inspection Certificate      |
+      | Vehicle             | Address                           |
+      | Vehicle             | Vehicle Insurance                  |
+      | City Requirements   | Background Check                  |
+      | City Requirements   | Vehicle-For-Hire Certificate        |
+      | City Requirements   | PTC Number                         |
+      | City Requirements   | Work Proof                        |
+      | City Requirements   | city permit                       |
 
-  Scenario: Upload vehicle insurance
-    Given I am on the onboarding checklist
-    When I tap "Vehicle Insurance"
-    Then I should see the vehicle insurance page
-    When I upload my insurance document
-    And I submit it
-    Then the insurance document status should change to "Submitted"
-
-  Scenario: Upload vehicle inspection report
-    Given I am on the onboarding checklist
-    When I tap "Vehicle Inspection"
-    Then I should see the vehicle inspection page
-    When I upload a valid vehicle inspection report
-    And I submit it
-    Then the document should be submitted for verification
-
-  Scenario: Submit criminal background check
-    Given I am on the onboarding checklist
-    When I tap "Criminal Background Check"
-    Then I should see the background check page with instructions
-    When I complete and upload the background check
-    And I submit it
-    Then the status should change to "Pending Review"
-
-  Scenario: Upload profile photo
-    Given I am on the onboarding checklist
-    When I tap "Profile Photo"
-    Then I should see the profile photo page
-    When I take or upload a clear face photo
-    And I submit it
-    Then the profile photo should be saved
-
-  Scenario: Submit driving experience
-    Given I am on the onboarding checklist
-    When I tap "Driving Experience"
-    Then I should see the driving experience page
-    When I enter my years of driving experience
-    And I submit
-    Then the driving experience should be recorded
-
-  Scenario: Submit preferred name
-    Given I am on the onboarding checklist
-    When I tap "Preferred Name"
-    And I enter "Ahmad" as my preferred display name
-    And I submit
-    Then my preferred name should be saved
-
-  # --- CITY-SPECIFIC REQUIREMENTS ---
-
-  Scenario: Upload Vehicle For Hire Certificate (Toronto/GTA)
-    Given I am onboarding in the GTA marketplace
-    When I tap "Vehicle For Hire Certificate"
-    Then I should see the certificate upload page
-    When I upload my Vehicle For Hire Certificate
-    And I submit it
-    Then the document should be submitted for verification
-
-  Scenario: Submit PTC License Number
-    Given I am onboarding in a marketplace requiring a PTC license
-    When I tap "PTC License Number"
-    And I enter my PTC license number
-    And I submit
-    Then the PTC number should be saved
-
-  Scenario: Submit HST/GST Number
-    Given I am on the onboarding checklist
-    When I tap "HST/GST Number"
-    And I enter my tax number
-    And I submit
-    Then the HST/GST number should be recorded
-
-  Scenario: Submit Tax Identification Number
-    Given I am on the onboarding checklist
-    When I tap "Tax Identification Number"
-    And I enter my SIN or tax ID
-    And I submit
-    Then the tax ID should be securely stored
-
-  # --- DOCUMENT UPLOAD FLOW ---
-
-  Scenario: Start document upload with S3 pre-signed URL
-    Given I am uploading a document
-    When a StartDocumentUploadRequest is sent
-    Then I should receive a pre-signed S3 upload URL
-    And the document should be uploaded to S3
-    And a CompleteDocumentUploadRequest should finalize the upload
-
-  Scenario: Document upload fails
-    Given I am uploading a document
-    When the upload to S3 fails
-    Then I should see an error message from UploadDocumentToS3State
-    And I should be able to retry the upload
-
-  Scenario: Document rejected during review
-    Given I have submitted my driver license
-    When the document is reviewed and rejected
-    Then the document status should change to "Rejected"
-    And I should see the rejection reason
-    And I should be able to re-upload
-
-  # --- ONBOARDING COMPLETION ---
-
-  Scenario: All documents submitted and approved
-    Given I have submitted all required documents
-    And all documents have been approved
-    Then my driver account status should change to "Approved"
-    And I should be eligible to go online and accept rides
-    And I should see the membership page
-
-  Scenario: Partial onboarding completion
-    Given I have submitted 4 of 7 required documents
-    When I view the onboarding checklist
-    Then I should see which documents are completed
-    And I should see which documents are still required
-    And I should not be able to go online until all are complete
-
-  # --- TRAINING ---
-
-  Scenario: Complete driver training
-    Given I am on the onboarding page
-    When I tap "Training"
-    Then I should see the training document page
-    When I complete the required training material
-    Then training should be marked as complete
-
-  # --- BANKING ---
-
-  Scenario: Set up banking for payouts
-    Given I am on the onboarding page
-    When I tap "Banking Requirements"
-    Then I should see the banking document page
-    When I provide my banking details for direct deposit
-    And I submit
-    Then my banking information should be saved for payouts
-
-  # --- HELP DURING ONBOARDING ---
-
-  Scenario: Access help for a specific document
-    Given I am on the driver license info page
-    When I tap the help button
-    Then I should see help content specific to driver license requirements
-    And I should see instructions on what to upload
-
-  # --- EDGE CASES ---
-
-  Scenario: Resume onboarding after app restart
-    Given I have partially completed onboarding
-    When I relaunch the app
-    Then I should be taken directly to the onboarding checklist
-    And my previously submitted documents should show as submitted
-
-  Scenario: Upload document with invalid file format
-    Given I am uploading a vehicle insurance document
-    When I select a file in an unsupported format
-    Then I should see an error about the file format
-    And I should be prompted to use a supported format (PDF, JPG, PNG)
-
-  Scenario: Use document scanner to capture document
-    Given I am on a document upload page
-    When I tap "Scan Document"
-    Then the document scanner should open
-    When I capture a clear photo of the document
-    Then the scanned image should be ready for upload
+  # --- NOT APPLICABLE IN THIS APP VERSION ---
+  #
+  # Everything below assumed a document list (Driver License, Vehicle Photo and Details,
+  # Vehicle Insurance, Vehicle Inspection, Criminal Background Check, Profile Photo, Driving
+  # Experience, Preferred Name, PTC License Number, HST/GST Number, Tax ID, Training, Banking)
+  # and interaction patterns (a scanner, S3 pre-signed-URL assertions, per-document approval/
+  # rejection states) that don't match the REAL checklist confirmed above. Left here for
+  # reference/traceability rather than deleted outright, since a future app version could
+  # genuinely add some of these back -- not implemented, not run (no step definitions, and no
+  # tag ties them into any current test run).
+  #
+  #   Scenario: Submit preferred name
+  #   Scenario: Upload Vehicle For Hire Certificate (Toronto/GTA) -- superseded by the real
+  #             "Vehicle-For-Hire Certificate" document under City Requirements above
+  #   Scenario: Submit PTC License Number -- superseded by "PTC Number" above
+  #   Scenario: Submit HST/GST Number
+  #   Scenario: Submit Tax Identification Number
+  #   Scenario: Start document upload with S3 pre-signed URL
+  #   Scenario: Document upload fails
+  #   Scenario: Document rejected during review
+  #   Scenario: All documents submitted and approved
+  #   Scenario: Partial onboarding completion
+  #   Scenario: Complete driver training
+  #   Scenario: Set up banking for payouts
+  #   Scenario: Access help for a specific document
+  #   Scenario: Resume onboarding after app restart
+  #   Scenario: Upload document with invalid file format
+  #   Scenario: Use document scanner to capture document
