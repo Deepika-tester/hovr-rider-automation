@@ -344,4 +344,26 @@ public class DriverRegistrationSteps {
         Assert.assertTrue(generic.isDisplayedPublic(generic.byTextContainsPublic("uploaded Successfully")),
                 "Expected upload success confirmation");
     }
+
+    // CONFIRMED 2026-09-23 on a real device: unlike every other document, Driver Selfie's
+    // "Upload" button opens the live Samsung Camera app (com.sec.android.app.camera) directly
+    // instead of the gallery photo picker. "Take picture" is the shutter button; "OK" confirms
+    // the just-captured photo on the review screen that follows (its counterpart, "Retry",
+    // discards and re-shoots — not used here). Both matched by exact text since they're short,
+    // common strings where a contains() match risks hitting something unrelated.
+    @When("I capture a photo for the document")
+    public void i_capture_a_photo_for_the_document() {
+        generic.tapTextPublic("Upload");
+        generic.tapTextPublic("Take picture");
+        generic.tapTextPublic("OK");
+    }
+
+    // CONFIRMED 2026-09-23 on a real device: the camera-capture path (unlike the gallery-picker
+    // path) returns straight to the document LIST with the status already reading "Submitted" —
+    // no separate "Document uploaded Successfully!" confirmation screen in between.
+    @Then("the document should show as submitted")
+    public void the_document_should_show_as_submitted() {
+        Assert.assertTrue(generic.isDisplayedPublic(generic.byTextContainsPublic("Submitted")),
+                "Expected document status to show as submitted");
+    }
 }

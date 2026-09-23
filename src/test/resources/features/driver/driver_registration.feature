@@ -137,8 +137,8 @@ Feature: Driver Registration and Onboarding
     # "Driver Selfie" deliberately excluded from these examples: CONFIRMED 2026-08-25 on a real
     # device that its "Upload" button opens the live CAMERA directly for this one document,
     # unlike every other document (where "Upload" opens the gallery photo picker this outline's
-    # steps automate) -- a genuine per-document UX difference, not a bug in these steps. Needs
-    # its own camera-capture automation (shutter button, etc.), not yet implemented/explored.
+    # steps automate) -- a genuine per-document UX difference, not a bug in these steps. Covered
+    # separately below ("Upload Driver Selfie via camera capture").
     Examples:
       | category           | document                          |
       | Driver              | Driver's License                  |
@@ -155,6 +155,19 @@ Feature: Driver Registration and Onboarding
       | City Requirements   | PTC Number                         |
       | City Requirements   | Work Proof                        |
       | City Requirements   | city permit                       |
+
+  # CONFIRMED 2026-09-23 on a real device: unlike every other document, Driver Selfie's "Upload"
+  # button opens the live Samsung Camera app directly instead of the gallery photo picker.
+  # Capturing (the "Take picture" shutter) and confirming ("OK" on the review screen) returns
+  # straight to the document LIST with the status already showing "Submitted" -- no separate
+  # "Document uploaded Successfully!" screen like the gallery-picker path shows.
+  @profile-auth
+  Scenario: Upload Driver Selfie via camera capture
+    Given I have created my driver profile in the GTA marketplace
+    And I am on the "Driver" document list
+    When I tap the "Driver Selfie" document
+    And I capture a photo for the document
+    Then the document should show as submitted
 
   # --- NOT APPLICABLE IN THIS APP VERSION ---
   #
