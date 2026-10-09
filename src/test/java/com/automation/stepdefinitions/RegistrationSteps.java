@@ -809,10 +809,18 @@ public class RegistrationSteps {
 
     /** Shared by registration and booking: leaves a freshly registered rider on the ride-home screen. */
     public void ensureOnRideHomeScreen() {
+        dismissRideHomeOverlays();
         if (generic.findAllPublic(generic.byTextPublic("Where to?")).isEmpty()) {
-            ensureOnWelcomeScreen();
-            generic.tapTextPublic("Ride now");
-            awaitRideHome();
+            if (outOfAreaShown()) {
+                // CONFIRMED 2026-10-09 (emulator, ~19 min run): the app can flip an already-logged-in
+                // rider to "We're not in your area" mid-run; the account is fine and a relaunch brings
+                // ride-home back, so don't throw the rider away and register a new one.
+                relaunchToRideHome();
+            } else {
+                ensureOnWelcomeScreen();
+                generic.tapTextPublic("Ride now");
+                awaitRideHome();
+            }
         }
         dismissRideHomeOverlays();
     }

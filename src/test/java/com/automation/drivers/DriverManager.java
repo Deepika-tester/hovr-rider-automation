@@ -37,6 +37,7 @@ public class DriverManager {
 
             if (!"iOS".equalsIgnoreCase(platformName)) {
                 grantAndroidRuntimePermissions();
+                setEmulatorLocationIfConfigured();
             }
 
             AppiumDriver driver = createSessionWithRetry(appiumUrl, platformName);
@@ -147,6 +148,27 @@ public class DriverManager {
         String state = enabled ? "enable" : "disable";
         runAdbShell("svc", "wifi", state);
         runAdbShell("svc", "data", state);
+    }
+
+    // Emulator only: an AVD has no real GPS and forgets any fixed location when it restarts, which
+    // would drop the rider outside the India marketplace ("We're not in your area"). If the config
+    // gives emulatorGeoLat/emulatorGeoLng, push that location before each session (adb emu geo fix
+    // takes longitude first). No-op on real devices, where those keys aren't set.
+    private static void setEmulatorLocationIfConfigured() {
+        String udid = ConfigReader.get("udid", "");
+        String lat = ConfigReader.get("emulatorGeoLat", "");
+        String lng = ConfigReader.get("emulatorGeoLng", "");
+        if (!udid.startsWith("emulator-") || lat.isBlank() || lng.isBlank()) {
+            return;
+        }
+        try {
+            new ProcessBuilder("adb", "-s", udid, "emu", "geo", "fix", lng, lat)
+                    .redirectErrorStream(true)
+                    .start()
+                    .waitFor(10, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (Exception e) {
+            // Non-fatal -- same stance as runAdbShell: don't fail driver init over a helper command.
+        }
     }
 
     private static void runAdbShell(String... shellArgs) {
