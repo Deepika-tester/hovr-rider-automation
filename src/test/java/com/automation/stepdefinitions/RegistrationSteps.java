@@ -698,9 +698,133 @@ public class RegistrationSteps {
         // if you need to verify these values server-side rather than just UI.
     }
 
+    // CONFIRMED 2026-09-21 on a real device (India marketplace enabled by the backend that day;
+    // before that, "Ride now" led to a "We're not in your area... yet" dead end, so this screen
+    // had never been seen): registration ends on "Welcome to HOVR" with a "Ride now" button, and
+    // that opens the ride-home screen -- Google map (content-desc "Google Map"), a "Where to?"
+    // search bar, "Add Home" / "Add Work" shortcuts and Ride / Trips / Account tabs. The old
+    // guessed accessibility id "ride_home_map" doesn't exist. A first-time-user "Watch how it
+    // works" tip and (on dev builds) an "Update Required" popup can sit on top, both with a
+    // "Skip" button, so they're dismissed before anything else touches the screen.
+    /** @return true if at least one popup/tip was dismissed */
+    private boolean dismissRideHomeOverlays() {
+        boolean dismissed = false;
+        for (int i = 0; i < 3; i++) {
+            // "Skip" = update popup / "Watch how it works" tip; "Got it" = "Your turn ... swipe up" tip.
+            java.util.List<org.openqa.selenium.WebElement> skip =
+                    generic.findAllPublic(generic.byTextPublic("Skip"));
+            if (skip.isEmpty()) {
+                skip = generic.findAllPublic(generic.byTextPublic("Got it"));
+            }
+            if (skip.isEmpty()) {
+                return dismissed;
+            }
+            skip.get(0).click();
+            dismissed = true;
+            sleepQuietly(800);
+        }
+        return dismissed;
+    }
+
+    private boolean rideHomeShownWithin(int seconds) {
+        for (int i = 0; i < seconds * 2; i++) {
+            if (!generic.findAllPublic(generic.byTextPublic("Where to?")).isEmpty()) {
+                return true;
+            }
+            // The "Update Required" popup shows up several seconds AFTER launch and hides "Where to?"
+            // from the accessibility tree, so keep skipping it while we wait.
+            dismissRideHomeOverlays();
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+        }
+        return false;
+    }
+
+    private boolean outOfAreaShown() {
+        return !generic.findAllPublic(generic.byTextContainsPublic("not in your area")).isEmpty();
+    }
+
+    private void sleepQuietly(long ms) {
+        try {
+            Thread.sleep(ms);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    // CONFIRMED 2026-09-21 on a real device: the app decides "is this rider in a supported area"
+    // asynchronously (seemingly once a location fix arrives), so right after registration the
+    // ride-home screen ("Where to?") can show for a moment and then flip to the "We're not in your
+    // area... yet" page -- and that page STAYS until the app is relaunched (the team's own advice
+    // when the India area was enabled: "just restart the app"). So: reach "Where to?", give it a
+    // few seconds to settle, and if the out-of-area page appeared, relaunch and check again. A
+    // relaunch also brings back the "Update Required" popup and the first-run tip, both skipped.
+    private void awaitRideHome() {
+        String appId = ConfigReader.get("appPackage");
+        for (int attempt = 1; attempt <= 3; attempt++) {
+            dismissRideHomeOverlays();
+            if (rideHomeShownWithin(12)) {
+                // CONFIRMED 2026-09-21: "Where to?" appears first, then ~6s later the "Update Required"
+                // popup arrives on top and takes over the accessibility tree, so a single early look
+                // proves nothing. Keep skipping popups and require the ride-home screen to stay clean
+                // (no popup, no out-of-area page) for 8 consecutive seconds.
+                int stable = 0;
+                for (int i = 0; i < 30 && stable < 8; i++) {
+                    boolean dismissed = dismissRideHomeOverlays();
+                    if (outOfAreaShown()) {
+                        break;
+                    }
+                    boolean home = !generic.findAllPublic(generic.byTextPublic("Where to?")).isEmpty();
+                    stable = (home && !dismissed) ? stable + 1 : 0;
+                    sleepQuietly(1000);
+                }
+                if (stable >= 8) {
+                    return;
+                }
+            }
+            if (attempt < 3) {
+                InteractsWithApps appsDriver = (InteractsWithApps) generic.driverPublic();
+                appsDriver.terminateApp(appId);
+                appsDriver.activateApp(appId);
+                sleepQuietly(5000);
+            }
+        }
+        Assert.fail("Ride home screen never stayed up after 3 launches (out-of-area page or a popup kept covering it)");
+    }
+
+    /** Relaunches the (already logged-in) app and waits until the ride-home screen is stable -- a
+     *  clean slate that also closes any half-open sheet (fare breakdown, payment, ...). */
+    public void relaunchToRideHome() {
+        String appId = ConfigReader.get("appPackage");
+        InteractsWithApps appsDriver = (InteractsWithApps) generic.driverPublic();
+        appsDriver.terminateApp(appId);
+        appsDriver.activateApp(appId);
+        sleepQuietly(4000);
+        awaitRideHome();
+    }
+
+    /** Shared by registration and booking: leaves a freshly registered rider on the ride-home screen. */
+    public void ensureOnRideHomeScreen() {
+        if (generic.findAllPublic(generic.byTextPublic("Where to?")).isEmpty()) {
+            ensureOnWelcomeScreen();
+            generic.tapTextPublic("Ride now");
+            awaitRideHome();
+        }
+        dismissRideHomeOverlays();
+    }
+
     @Then("I should be navigated to the ride home page")
     public void i_should_be_navigated_to_ride_home_page() {
-        Assert.assertTrue(generic.isDisplayedPublic(generic.byAccessibilityIdPublic("ride_home_map")), // VERIFY
+        if (!generic.findAllPublic(generic.byTextPublic("Ride now")).isEmpty()) {
+            generic.tapTextPublic("Ride now");
+        }
+        awaitRideHome();
+        dismissRideHomeOverlays();
+        Assert.assertTrue(generic.isDisplayedPublic(generic.byTextPublic("Where to?")),
                 "Ride home page not shown");
     }
 

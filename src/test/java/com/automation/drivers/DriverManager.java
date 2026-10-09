@@ -44,6 +44,15 @@ public class DriverManager {
             driver.manage().timeouts().implicitlyWait(
                     Duration.ofSeconds(ConfigReader.getInt("implicitWaitSeconds")));
 
+            // CONFIRMED 2026-09-21 on a real device: the app's "Update Required" popup (Skip / Update)
+            // appears several seconds after launch in its own window. With the default settings the
+            // driver's page source and element lookups only cover the app's main window, so the popup
+            // was invisible to the tests (getPageSource had no "Skip" while the screenshot clearly
+            // showed it) and could never be dismissed. Include every window.
+            if (driver instanceof AndroidDriver) {
+                ((AndroidDriver) driver).setSetting("enableMultiWindows", true);
+            }
+
             driverThreadLocal.set(driver);
         } catch (MalformedURLException e) {
             throw new RuntimeException("Invalid Appium server URL in config.properties", e);

@@ -169,8 +169,18 @@ public class BasePage {
         }
     }
 
+    // Existence checks must answer immediately: with the driver's implicit wait (10s) findElements
+    // blocks that long every time nothing matches, which turned polling loops (e.g. waiting for a
+    // screen to settle, or "is a popup showing?") into multi-minute waits. Drop the implicit wait for
+    // the lookup and restore it afterwards.
     protected List<WebElement> findAll(By locator) {
-        return driver.findElements(locator);
+        driver.manage().timeouts().implicitlyWait(Duration.ZERO);
+        try {
+            return driver.findElements(locator);
+        } finally {
+            driver.manage().timeouts().implicitlyWait(
+                    Duration.ofSeconds(com.automation.utils.ConfigReader.getInt("implicitWaitSeconds")));
+        }
     }
 
     // ---------------------------------------------------------------

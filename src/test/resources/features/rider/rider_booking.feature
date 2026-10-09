@@ -18,6 +18,7 @@ Feature: Rider Ride Booking
 
   # --- DESTINATION SEARCH ---
 
+  @positive
   Scenario: Search for a destination from home screen
     Given I am on the ride home screen
     When I tap the "Where to?" search field
@@ -25,18 +26,66 @@ Feature: Rider Ride Booking
     And I should see my saved places if any exist
     And I should see my recent places if any exist
 
+  @positive
   Scenario: Enter a destination address
     Given I am on the plan your trip view
-    When I type "100 Queen St W, Toronto" in the destination field
+    When I type "CP67 Mall" in the destination field
     Then I should see a list of address suggestions from Google Places API
     And the suggestions should be relevant to my search query
 
+  @positive
   Scenario: Select a destination from suggestions
-    Given I have searched for "100 Queen St W, Toronto"
+    Given I have searched for "CP67 Mall"
     And I see address suggestions
-    When I tap on "100 Queen St W, Toronto, ON M5H 2N2"
+    When I tap on the suggestion "CP67 Mall Mohali"
     Then the destination should be set with latitude and longitude
     And I should be navigated to the route view with the map showing the route
+
+  # --- NEGATIVE: DESTINATION SEARCH ---
+  # CONFIRMED 2026-09-21 on a real device: a search the app can't resolve shows "Hmm, we couldn't
+  # find that location. Check your spelling." and no suggestion rows. In the India marketplace this
+  # includes addresses that exist elsewhere (e.g. Toronto). None of these creates or requests a ride.
+
+  @negative
+  Scenario: Search for an address that does not exist
+    Given I am on the plan your trip view
+    When I type "zzqxqx 999 nowhere lane" in the destination field
+    Then I should see a message that the location could not be found
+    And I should not see any address suggestions
+    And I should not be shown the choose a ride sheet
+
+  @negative
+  Scenario: Search for an address outside the supported area
+    Given I am on the plan your trip view
+    When I type "100 Queen St W, Toronto" in the destination field
+    Then I should see a message that the location could not be found
+    And I should not see any address suggestions
+    And I should not be shown the choose a ride sheet
+
+  @negative
+  Scenario: Clear the destination after searching
+    Given I have searched for "CP67 Mall"
+    And I see address suggestions
+    When I clear the destination field
+    Then I should not see any address suggestions
+    And I should not be shown the choose a ride sheet
+    And I should see the plan your trip view
+
+  @negative
+  Scenario: Search with only special characters
+    Given I am on the plan your trip view
+    When I type "!@#$%^&*()" in the destination field
+    Then I should not see any address suggestions
+    And I should not be shown the choose a ride sheet
+    And I should see the plan your trip view
+
+  @negative
+  Scenario: Search with a very long text
+    Given I am on the plan your trip view
+    When I type a destination that is 300 characters long
+    Then I should not see any address suggestions
+    And I should not be shown the choose a ride sheet
+    And I should see the plan your trip view
 
   Scenario: Use a saved place as destination
     Given I have a saved place "Work" at "200 Bay St, Toronto"
@@ -54,22 +103,25 @@ Feature: Rider Ride Booking
 
   # --- RIDE TYPE SELECTION ---
 
+  # 2026-09-21: tested in the India marketplace with a local destination; pickup defaults to the
+  # phone's current location. Only "HOVR" is used -- the second listed ride option (and "HOVR XL",
+  # which doesn't exist there) is a testing service the team will provide later, so the XL
+  # comparison and per-ride-type ETA steps were dropped (the ETA is shown on the map pin, not per
+  # ride row).
+  @positive
   Scenario: View available ride types with fare estimates
-    Given I have set pickup at "Union Station, Toronto"
-    And I have set destination at "Pearson Airport, Mississauga"
+    Given I have set pickup at "current location"
+    And I have set destination at "CP67 Mall"
     When the route is calculated
-    Then I should see the "Choose a Ride" bottom sheet
+    Then I should see the "Choose a ride" bottom sheet
     And I should see ride type "HOVR" with an estimated fare
-    And I should see ride type "HOVR XL" with an estimated fare
-    And HOVR XL fare should be higher than HOVR fare
-    And I should see the estimated arrival time for each ride type
 
+  @positive
   Scenario: Select HOVR ride type
     Given I see available ride types
-    And "HOVR" is displayed with fare "$25.50"
-    When I tap on "HOVR"
+    And "HOVR" is displayed with a fare
+    When I tap on the ride type "HOVR"
     Then "HOVR" should be highlighted as the selected ride type
-    And the fare displayed should be "$25.50"
 
   Scenario: Select HOVR XL ride type
     Given I see available ride types
@@ -77,16 +129,17 @@ Feature: Rider Ride Booking
     Then "HOVR XL" should be highlighted as the selected ride type
     And I should see the updated fare for HOVR XL
 
+  # CONFIRMED 2026-09-21: the real breakdown is Fare / Subtotal / Fees / Est. Total.
+  @positive
   Scenario: View fare breakdown
     Given I have selected ride type "HOVR"
-    When I tap "View Breakdown"
+    When I open the fare breakdown
     Then I should see the fare breakdown including:
       | component     |
-      | Base fare     |
-      | Distance      |
-      | Time          |
-      | Service fee   |
-      | Total         |
+      | Fare          |
+      | Subtotal      |
+      | Fees          |
+      | Est. Total    |
 
   # --- CONFIRM AND BOOK ---
 
@@ -98,17 +151,25 @@ Feature: Rider Ride Booking
     And I should see "Finding your driver..." screen
     And the ride status should be "PENDING"
 
+  # A fresh rider skipped adding a card, so the row reads "Add a payment method".
+  @positive
   Scenario: View payment method before confirming
     Given I am on the choose a ride bottom sheet
-    Then I should see my default payment method card brand and last four digits
+    Then I should see the payment method row
     When I tap on the payment method
     Then I should be navigated to change payment method
 
+  @negative
   Scenario: Confirm ride without payment method
     Given I do not have a payment method on file
     When I try to confirm a ride
     Then I should see a prompt to add a payment method
     And I should not be able to proceed until a payment method is added
+    When I choose "Add payment method" from the prompt
+    Then I should be navigated to change payment method
+    When I try to confirm a ride
+    And I choose "Nevermind" from the prompt
+    Then I should still be on the choose a ride bottom sheet
 
   # --- FINDING DRIVER ---
 
