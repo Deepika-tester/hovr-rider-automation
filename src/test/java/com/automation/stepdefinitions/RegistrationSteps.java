@@ -154,6 +154,7 @@ public class RegistrationSteps {
         java.util.List<org.openqa.selenium.WebElement> editTexts =
                 new org.openqa.selenium.support.ui.WebDriverWait(generic.driverPublic(), java.time.Duration.ofSeconds(10))
                         .until(d -> {
+                            generic.dismissUpdatePopupPublic();
                             java.util.List<org.openqa.selenium.WebElement> found =
                                     generic.findAllPublic(By.className("android.widget.EditText"));
                             return found.size() >= 2 ? found : null;
@@ -178,6 +179,7 @@ public class RegistrationSteps {
         // CONFIRMED 2026-09-18: clear first -- same stale-state class of bug as the OTP field
         // (see enterOtpCode's javadoc). A number left over from an earlier scenario/failed run
         // would otherwise get a fresh number appended onto it instead of replaced.
+        generic.dismissUpdatePopupPublic();
         org.openqa.selenium.WebElement field =
                 generic.waitForPublic(By.className("android.widget.EditText"));
         field.clear();
@@ -319,6 +321,7 @@ public class RegistrationSteps {
     // catch up before something else touches this screen. A short pause after entering it fixes
     // this without needing to guess at what's racing what internally.
     private void enterOtpCode(String code) {
+        generic.dismissUpdatePopupPublic();
         org.openqa.selenium.WebElement field =
                 generic.waitForPublic(By.className("android.widget.EditText"));
         field.clear();

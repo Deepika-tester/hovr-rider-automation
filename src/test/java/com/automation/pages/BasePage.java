@@ -101,15 +101,72 @@ public class BasePage {
         return AppiumBy.xpath("//*[contains(@label," + literal + ") or contains(@name," + literal + ") or contains(@value," + literal + ")]");
     }
 
+    // Same semantics as ExpectedConditions.visibilityOfElementLocated / elementToBeClickable (first
+    // match that is displayed / displayed+enabled), but each poll first clears the "Update Required"
+    // popup: once it is up it hides the whole screen behind it from the accessibility tree, so a plain
+    // wait would just time out on a screen that is really there.
     protected WebElement waitFor(By locator) {
-        return wait.until(ExpectedConditions.visibilityOfElementLocated(locator));
+        return wait.until(d -> {
+            dismissUpdatePopupIfShown();
+            for (WebElement el : findAll(locator)) {
+                try {
+                    if (el.isDisplayed()) {
+                        return el;
+                    }
+                } catch (org.openqa.selenium.StaleElementReferenceException ignored) {
+                    // went away between find and check; the next poll will re-find it
+                }
+            }
+            return null;
+        });
     }
 
     protected WebElement waitForClickable(By locator) {
-        return wait.until(ExpectedConditions.elementToBeClickable(locator));
+        return wait.until(d -> {
+            dismissUpdatePopupIfShown();
+            for (WebElement el : findAll(locator)) {
+                try {
+                    if (el.isDisplayed() && el.isEnabled()) {
+                        return el;
+                    }
+                } catch (org.openqa.selenium.StaleElementReferenceException ignored) {
+                    // see waitFor
+                }
+            }
+            return null;
+        });
+    }
+
+    // CONFIRMED 2026-10-12 (rider dev build +588): the "Update Required" popup (Skip / Update) is no
+    // longer confined to the ride-home screen -- it also lands on top of the phone-entry screen and
+    // steals focus mid-typing ("Cached elements ... do not exist in DOM anymore"). It arrives a few
+    // seconds after launch, on any screen, so every tap and text entry first clears it.
+    //
+    // Also handles Google Play services' "Location Accuracy" prompt ("Turn on" / "No thanks"), which a
+    // FRESH emulator shows on top of the app the first time it asks for location (CONFIRMED 2026-10-12:
+    // it blocked every screen behind it, so the app looked stuck on "not in your area"). Accepting it
+    // just enables the emulator's own location accuracy; real devices that already have it never show it.
+    protected boolean dismissUpdatePopupIfShown() {
+        if (!findAll(byTextContains("Location Accuracy")).isEmpty()) {
+            List<WebElement> turnOn = findAll(byText("Turn on"));
+            if (!turnOn.isEmpty()) {
+                turnOn.get(0).click();
+                return true;
+            }
+        }
+        if (findAll(byText("Update Required")).isEmpty()) {
+            return false;
+        }
+        List<WebElement> skip = findAll(byText("Skip"));
+        if (skip.isEmpty()) {
+            return false;
+        }
+        skip.get(0).click();
+        return true;
     }
 
     protected void tap(By locator) {
+        dismissUpdatePopupIfShown();
         // CONFIRMED 2026-08-10: the on-screen keyboard covers/intercepts taps on buttons below
         // a text field (e.g. "Continue" on the name/email entry screens) until it's dismissed —
         // a real element.click() still lands on the keyboard, not the button underneath, since
@@ -155,6 +212,7 @@ public class BasePage {
         // did nothing until the element was tapped first). Fields that happen to be pre-focused
         // on screen load (phone number, OTP) worked without this; anything else silently failed.
         // Tapping first makes this reliable everywhere, not just where we happened to get lucky.
+        dismissUpdatePopupIfShown();
         WebElement el = waitFor(locator);
         el.click();
         el.clear();
@@ -223,6 +281,10 @@ public class BasePage {
 
     public boolean isDisplayedPublic(By locator) {
         return isDisplayed(locator);
+    }
+
+    public boolean dismissUpdatePopupPublic() {
+        return dismissUpdatePopupIfShown();
     }
 
     public List<WebElement> findAllPublic(By locator) {
