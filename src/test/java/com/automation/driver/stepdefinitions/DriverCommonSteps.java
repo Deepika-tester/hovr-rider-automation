@@ -38,8 +38,17 @@ public class DriverCommonSteps {
     @When("I select country code {string}")
     public void i_select_country_code(String code) {
         // CONFIRMED 2026-08-25 on a real device: the phone entry screen already defaults to
-        // "+1" with no picker interaction needed for this test's Canadian numbers — same
-        // resolution as the rider app's equivalent step.
+        // "+1" with no picker interaction needed for Canadian numbers — same resolution as the
+        // rider app's equivalent step.
+        // 2026-10-14: the staging OTP bypass (111111) now only works for India (+91) numbers, so
+        // "+91" is picked through the same country-search flow the rider suite uses.
+        if ("+91".equals(code)) {
+            if (!ui.findAllPublic(ui.byTextPublic("+91")).isEmpty()) {
+                return;
+            }
+            new com.automation.stepdefinitions.RegistrationSteps().selectIndiaCountryCode();
+            return;
+        }
         Assert.assertTrue(ui.isDisplayedPublic(ui.byTextPublic(code)),
                 "Expected country code " + code + " to already be selected");
     }

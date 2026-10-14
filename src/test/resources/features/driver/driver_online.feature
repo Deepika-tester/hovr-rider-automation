@@ -1,4 +1,4 @@
-@driver @online @core
+@driver @online @core @needs-approved-driver
 Feature: Driver Go Online/Offline
   As an approved HOVR driver
   I want to toggle my availability status
@@ -11,6 +11,15 @@ Feature: Driver Go Online/Offline
   # UI: initial_status_bottom_sheet.dart, driver_status_bottom_sheet.dart
   # Stream: DriverStreamResponse (bidirectional gRPC stream with heartbeat)
   # Location: LocationServiceBloc for real-time location streaming
+
+  # STATUS (checked 2026-10-14 against driver dev v6.2.4+592 on the emulator): NOT AUTOMATABLE YET.
+  # Everything below needs an APPROVED driver (documents verified, ID verified, membership paid, then
+  # "go online"). The only driver this environment can create stays "Pending": documents can't be
+  # approved without a reviewer, the dev membership payment page answers "Payment server is down", and
+  # the dashboard keeps Referral Program / Member Benefits locked behind "Verify now". Kept as a
+  # specification (derived from the app source, not from a live run); the scenarios have no step
+  # definitions and the @needs-approved-driver tag keeps them out of every test run.
+  # What IS verified on a Pending driver lives in driver_profile.feature and driver_registration.feature.
 
   Background:
     Given I am an approved HOVR driver

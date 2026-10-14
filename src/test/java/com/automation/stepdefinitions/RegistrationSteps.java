@@ -138,7 +138,7 @@ public class RegistrationSteps {
     // (an earlier prod build (v581) didn't expose one at all in the accessibility tree, which is
     // why country selection used to be entirely unimplemented — see the old
     // UnsupportedOperationException this replaces).
-    private void selectIndiaCountryCode() {
+    public void selectIndiaCountryCode() {
         generic.tapPublic(COUNTRY_CODE_SELECTOR);
         // CONFIRMED 2026-09-17: opening the picker does NOT remove the original phone-number
         // EditText from the tree -- it's still there (now hidden behind the picker) and sorts
@@ -268,7 +268,7 @@ public class RegistrationSteps {
     // selectIndiaCountryCode's javadoc. There's no equivalent always-fictional prefix block for
     // Indian mobile numbers to anchor on, but the bypass doesn't require a real subscriber, just
     // a fresh 10-digit number starting with a valid mobile prefix (6-9) each run.
-    private static String uniqueTestPhoneNumber() {
+    public static String uniqueTestPhoneNumber() {
         return "9" + String.format("%09d", System.currentTimeMillis() % 1_000_000_000L);
     }
 

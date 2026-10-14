@@ -1,4 +1,4 @@
-@rider @promo
+@rider @promo @needs-ride
 Feature: Rider Promotions and Discounts
   As a rider
   I want to apply promotional codes and earn discounts
@@ -7,6 +7,10 @@ Feature: Rider Promotions and Discounts
   # Derived from: HOVR marketing campaigns (GoodLife $10 off, FIFA26, etc.)
   # Promo application happens during ride booking via wallet credits
   # Wallet visible in: PaymentState -> ListPaymentMethodState (userWallet field)
+
+  # STATUS (checked 2026-10-14, rider dev v6.3.0+588 on the emulator): NOT RUN.
+  # Promo codes are applied while confirming a ride, and the 14 ride-confirming booking scenarios are held until they are approved (they create real ride requests on the dev backend). Written from the app source, not from a live run.
+  # Tagged @needs-ride and excluded from the default rider run (see TestRunner).
 
   Background:
     Given I am a registered rider

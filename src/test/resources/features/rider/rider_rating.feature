@@ -1,4 +1,4 @@
-@rider @rating
+@rider @rating @needs-ride
 Feature: Rider Rating and Feedback
   As a rider who has completed a trip
   I want to rate my driver and provide feedback
@@ -8,6 +8,10 @@ Feature: Rider Rating and Feedback
   # and refer-and-earn/presentation/bloc/referral_event.dart (SubmitRatingEvent)
   # Rating fields: rating (int), rideId, comments (list), suggestion, ratingGivenTo, furtherSupport, status
   # States: RatingState -> AddTipState (after optional tip)
+
+  # STATUS (checked 2026-10-14, rider dev v6.3.0+588 on the emulator): NOT RUN.
+  # Rating needs a completed trip, which needs a driver to accept and finish a ride. The test environment has no approved driver (see driver features), so this cannot be reached. Written from the app source, not from a live run.
+  # Tagged @needs-ride and excluded from the default rider run (see TestRunner).
 
   Background:
     Given I am a registered rider

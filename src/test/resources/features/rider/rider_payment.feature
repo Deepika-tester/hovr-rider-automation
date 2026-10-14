@@ -1,4 +1,4 @@
-@rider @payment
+@rider @payment @needs-ride
 Feature: Rider Payment Management
   As a registered rider
   I want to manage my payment methods
@@ -9,6 +9,10 @@ Feature: Rider Payment Management
   # States: ListPaymentMethodState (list, userWallet, defaultPaymentMethodId), AdyenDropInState (sessionId, sessionData)
   # Payment provider: Adyen (drop-in component)
   # Services: IAM service payment handlers
+
+  # STATUS (checked 2026-10-14, rider dev v6.3.0+588 on the emulator): NOT RUN.
+  # Wallet basics ARE verified (rider_profile.feature: balance, Google Pay as a payment method, "Add payment method" offers Credit or debit card). The scenarios below go further (saving/removing a card, default card, fare charging) and were written from the app source, not from a live run.
+  # Tagged @needs-ride and excluded from the default rider run (see TestRunner).
 
   Background:
     Given I am a registered rider

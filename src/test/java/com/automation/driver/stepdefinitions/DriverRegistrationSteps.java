@@ -83,6 +83,9 @@ public class DriverRegistrationSteps {
 
     @When("I enter phone number {string}")
     public void i_enter_phone_number(String phoneNumber) {
+        if ("{unique}".equals(phoneNumber)) {
+            phoneNumber = com.automation.stepdefinitions.RegistrationSteps.uniqueTestPhoneNumber();
+        }
         WebElement field = generic.waitForPublic(By.className("android.widget.EditText"));
         field.click();
         field.clear();
@@ -139,7 +142,9 @@ public class DriverRegistrationSteps {
             return;
         }
         ensureOnPhoneEntryScreen();
-        i_enter_phone_number(uniqueTestPhoneNumber());
+        // 111111 only works for India numbers now, so every self-navigating scenario registers one.
+        new com.automation.stepdefinitions.RegistrationSteps().selectIndiaCountryCode();
+        i_enter_phone_number("{unique}");
         generic.tapTextPublic("Continue");
         i_should_see_the_otp_verification_screen();
     }

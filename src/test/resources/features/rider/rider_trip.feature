@@ -1,4 +1,4 @@
-@rider @trip @core
+@rider @trip @core @needs-ride
 Feature: Rider Trip Lifecycle
   As a rider with a confirmed booking
   I want to track my ride from pickup to drop-off
@@ -9,6 +9,10 @@ Feature: Rider Trip Lifecycle
   #                     HeadingTowardsDestination -> Rating -> Complete
   # Streams: TripStreamResponse (real-time updates via gRPC bidirectional stream)
   # Chat: TripStreamRequest_OutboundChatMessage for in-trip messaging
+
+  # STATUS (checked 2026-10-14, rider dev v6.3.0+588 on the emulator): NOT RUN.
+  # The trips list (empty state) is verified in rider_profile.feature. Everything below needs a confirmed ride with a driver on the way, which needs an approved driver. Written from the app source, not from a live run.
+  # Tagged @needs-ride and excluded from the default rider run (see TestRunner).
 
   Background:
     Given I am a registered rider

@@ -1,4 +1,4 @@
-@driver @membership
+@driver @membership @needs-approved-driver
 Feature: Driver Membership Management
   As a HOVR driver
   I want to manage my $20/month membership
@@ -12,6 +12,15 @@ Feature: Driver Membership Management
   # Model: $20 CAD/month flat fee, driver keeps 100% of fare
   # Note: Many membership events are commented out (Create, Cancel, Reactivate, Get, Change, List)
   #       indicating the feature is partially implemented via payment URL webview
+
+  # STATUS (checked 2026-10-14 against driver dev v6.2.4+592 on the emulator): NOT AUTOMATABLE YET.
+  # Everything below needs an APPROVED driver (documents verified, ID verified, membership paid, then
+  # "go online"). The only driver this environment can create stays "Pending": documents can't be
+  # approved without a reviewer, the dev membership payment page answers "Payment server is down", and
+  # the dashboard keeps Referral Program / Member Benefits locked behind "Verify now". Kept as a
+  # specification (derived from the app source, not from a live run); the scenarios have no step
+  # definitions and the @needs-approved-driver tag keeps them out of every test run.
+  # What IS verified on a Pending driver lives in driver_profile.feature and driver_registration.feature.
 
   Background:
     Given I am an approved HOVR driver

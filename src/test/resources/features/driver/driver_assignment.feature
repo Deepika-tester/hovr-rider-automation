@@ -1,4 +1,4 @@
-@driver @assignment @new-feature
+@driver @assignment @new-feature @needs-approved-driver
 Feature: Driver Assignments (Recurring Pre-Scheduled Routes)
   As a HOVR driver seeking predictable income
   I want to apply for and manage recurring route assignments
@@ -10,6 +10,15 @@ Feature: Driver Assignments (Recurring Pre-Scheduled Routes)
   # Matching: Geo-radius <= 5km, first-come-first-served, tie-breaker by rating + on-time %
   # Driver obligations: 5-min pickup window, rating >= 4.7, active insurance
   # Cancellation: >= 24h notice required, strike system (1st=14d, 2nd=60d, 3rd=permanent ban)
+
+  # STATUS (checked 2026-10-14 against driver dev v6.2.4+592 on the emulator): NOT AUTOMATABLE YET.
+  # Everything below needs an APPROVED driver (documents verified, ID verified, membership paid, then
+  # "go online"). The only driver this environment can create stays "Pending": documents can't be
+  # approved without a reviewer, the dev membership payment page answers "Payment server is down", and
+  # the dashboard keeps Referral Program / Member Benefits locked behind "Verify now". Kept as a
+  # specification (derived from the app source, not from a live run); the scenarios have no step
+  # definitions and the @needs-approved-driver tag keeps them out of every test run.
+  # What IS verified on a Pending driver lives in driver_profile.feature and driver_registration.feature.
 
   Background:
     Given I am an approved HOVR driver

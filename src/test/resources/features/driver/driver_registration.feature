@@ -47,10 +47,10 @@ Feature: Driver Registration and Onboarding
   @profile-auth
   Scenario: Enter a valid phone number and receive OTP
     Given I am on the phone number entry screen
-    When I select country code "+1"
-    And I enter phone number "6475559876"
+    When I select country code "+91"
+    And I enter phone number "{unique}"
     And I tap "Continue"
-    Then an OTP should be sent to "+16475559876"
+    Then an OTP should be sent to "+91{unique}"
     And I should see the OTP verification screen
 
   # KNOWN INTERMITTENT FAILURE 2026-08-25: passes reliably in isolation, but has failed twice
@@ -243,8 +243,8 @@ Feature: Driver Registration and Onboarding
     And I am on the driver landing page
     When I tap "Get Started" or "Sign Up"
     Then I should see the phone number entry screen
-    When I select country code "+1"
-    And I enter phone number "6475551234"
+    When I select country code "+91"
+    And I enter phone number "{unique}"
     And I tap "Continue"
     Then I should see the OTP verification screen
     When I enter the correct OTP

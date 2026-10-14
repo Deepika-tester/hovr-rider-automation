@@ -1,4 +1,4 @@
-@rider @referral
+@rider @referral @needs-ride
 Feature: Rider Refer and Earn
   As a registered rider
   I want to refer friends to HOVR and earn rewards
@@ -8,6 +8,10 @@ Feature: Rider Refer and Earn
   # Key blocs: ReferralBloc (events: GetReferralCode, RedeemReferralCode, GetReferList)
   # States: ReferralCodeSuccessState (GetReferralProfileResponse), ReferralCodeRedeemSuccessState, ReferralListSuccessState
   # Pages: refer_and_earn.dart, redeem_referral_code_view.dart, referral_progress.dart, qr_scanner.dart
+
+  # STATUS (checked 2026-10-14, rider dev v6.3.0+588 on the emulator): NOT RUN.
+  # The referral screen itself is verified (rider_profile.feature: "Refer and earn", referral link, Share with Rider, Enter a referral code, Referral history). Redeeming valid/invalid codes and the progress/reward flows were written from the app source, not from a live run, and referral-code scenarios were deprioritised.
+  # Tagged @needs-ride and excluded from the default rider run (see TestRunner).
 
   Background:
     Given I am a registered rider

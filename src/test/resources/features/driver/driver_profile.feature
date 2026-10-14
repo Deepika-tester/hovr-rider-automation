@@ -1,217 +1,120 @@
-@driver @profile
-Feature: Driver Profile and Settings
-  As a HOVR driver
-  I want to manage my profile, vehicle, documents, and app settings
-  So that I can keep my account up to date
+@driver @profile @driver-account
+Feature: Driver Dashboard, Profile and Account Area
+  As a HOVR driver who has signed up
+  I want to see what I still need to do and manage my profile
+  So that I can finish onboarding and start driving
 
-  # Derived from: hovr-driver-app/lib/features/home-view/presentation/pages/drawer-screens/
-  # and documents-feature/
-  # Pages: account.dart, my_vehicle_details.dart, banking_details.dart, app_settings.dart,
-  #         driver_profile_screen.dart, language_settings_screen.dart
-  # Documents: document_list_view.dart, document_scope_view.dart, document_upload_view.dart
-  # Banking widgets: account_status_card.dart, capabilities_card.dart,
-  #                   manage_bank_button.dart, payout_status_card.dart
+  # Explored on a real build (driver dev v6.2.4+592, emulator, India marketplace) on 2026-10-14, signed in
+  # as the existing test driver (+91 7428730894, staging OTP 111111). This replaces the earlier
+  # scenarios that were derived from source code and assumed an APPROVED driver (drawer screens, banking,
+  # app settings, language) -- none of those exist on a driver who is still "Pending".
+  #
+  # What a freshly signed-up (Pending) driver sees:
+  #  - Dashboard: header "SIGNING UP FOR INDIA", "Welcome <first name>", "Here's what you need to do to set
+  #    up your account.", tabs Rideshare / Co-Commute, cards "Vehicle" (Required 1/1) and "Membership"
+  #    (Required 1/1), plus "Referral Program" and "Member Benefits" which stay locked behind a
+  #    "Verify now" ID-verification button.
+  #  - Menu (top right): Help, Profile, Logout.
+  #  - Profile: status Pending, 0 Rides, 5.00 Rating, Account Info (Driver ID, Legal Name, Preferred Name,
+  #    Phone, Email).
+  #  - Vehicle > "Vehicle Documents" lists "Vehicle Registration | Required"; its page offers Upload and
+  #    Camera. (India's checklist is one document; the GTA marketplace shows the 15-document checklist
+  #    covered in driver_registration.feature.)
+  #  - Co-Commute tab is gated: "Driver is not registered in this marketplace" and a "driver pic | Missing"
+  #    requirement that opens a photo upload page.
+  #  - Help opens "Support tickets" (create / FAQ).
+  #
+  # NOT automated: actually uploading documents on the emulator (needs the system photo picker / camera),
+  # paying for the membership (the dev payment web page answers "Payment server is down"), ID
+  # verification, going online, ride requests and trips -- they all need an APPROVED driver, which this
+  # environment cannot produce (see the @needs-approved-driver features).
 
   Background:
-    Given I am an approved HOVR driver
-    And I am logged into the driver app
+    Given I am signed in as the test driver
 
-  # --- PROFILE ---
+  # --- DASHBOARD ---
 
-  Scenario: View driver profile
-    Given I navigate to my profile screen
-    Then I should see my profile information:
-      | field          |
-      | Name           |
+  @positive
+  Scenario: Dashboard shows the account set-up checklist for a pending driver
+    Then I should see all of these driver texts:
+      | SIGNING UP FOR      |
+      | INDIA               |
+      | Welcome             |
+      | set up your account |
+      | Vehicle             |
+      | Membership          |
+
+  @positive
+  Scenario: Referral Program and Member Benefits are locked until the ID is verified
+    Then I should see all of these driver texts:
+      | Referral Program |
+      | Member Benefits  |
+      | Verify now       |
+
+  # --- VEHICLE DOCUMENTS ---
+
+  @positive
+  Scenario: Vehicle card lists the required vehicle document
+    When I open the "Vehicle" card
+    Then I should see the driver text "Vehicle Documents"
+    And I should see the driver text "Vehicle Registration"
+    And I should see the driver text "Required"
+
+  @positive
+  Scenario: A vehicle document page offers Upload and Camera
+    When I open the "Vehicle" card
+    And I open the "Vehicle Registration" card
+    Then I should see all of these driver texts:
+      | Upload |
+      | Camera |
+
+  # --- MENU AND PROFILE ---
+
+  @positive
+  Scenario: Menu lists Help, Profile and Logout
+    When I open the driver menu
+    Then I should see all of these driver texts:
+      | Help    |
+      | Profile |
+      | Logout  |
+
+  @positive
+  Scenario: Profile shows the driver's account info
+    When I open the driver menu
+    And I open the "Profile" card
+    Then I should see all of these driver texts:
+      | Account Info   |
+      | Driver ID      |
+      | Legal Name     |
+      | Preferred Name |
+      | Phone          |
       | Email          |
-      | Phone number   |
-      | Profile photo  |
-      | Driver rating  |
-      | Preferred name |
+      | Rides          |
+      | Rating         |
+      | Pending        |
 
-  Scenario: Edit preferred name
-    Given I am on my profile screen
-    When I tap "Edit"
-    And I change my preferred name to "Ahmad K."
-    And I save
-    Then my preferred name should be updated
+  @positive
+  Scenario: Help opens the support tickets page
+    When I open the driver menu
+    And I open the "Help" card
+    Then I should see the driver text "Support tickets"
 
-  # --- ACCOUNT ---
+  # --- CO-COMMUTE (gated for this driver) ---
 
-  Scenario: View account details
-    Given I navigate to the account screen
-    Then I should see sections for:
-      | section           |
-      | My Vehicle        |
-      | Banking Details   |
-      | App Settings      |
-      | Documents         |
+  @negative
+  Scenario: Co-Commute is not available until the driver is registered in the marketplace
+    When I switch to the "Co-Commute" dashboard tab
+    Then I should see all of these driver texts:
+      | Share your daily commute          |
+      | Action required                   |
+      | not registered in this marketplace |
+      | driver pic                        |
+      | Missing                           |
 
-  # --- VEHICLE DETAILS ---
-
-  Scenario: View my vehicle details
-    Given I navigate to "My Vehicle"
-    Then I should see my vehicle information:
-      | field         |
-      | Make          |
-      | Model         |
-      | Year          |
-      | Color         |
-      | License plate |
-      | Photos        |
-
-  Scenario: Update vehicle details
-    Given I am on the my vehicle screen
-    When I update my license plate number
-    And I save the changes
-    Then the vehicle details should be updated
-
-  # --- BANKING ---
-
-  Scenario: View banking details
-    Given I navigate to "Banking Details"
-    Then I should see:
-      | section           |
-      | Account status    |
-      | Payout status     |
-      | Capabilities      |
-      | Manage bank       |
-
-  Scenario: View payout status
-    Given I am on the banking details screen
-    Then I should see the payout status card
-    And I should see my current payout balance
-    And I should see recent payout history
-
-  Scenario: Update banking information
-    Given I am on the banking details screen
-    When I tap "Manage Bank"
-    Then I should be able to update my bank account details
-    When I enter new banking details
-    And I save
-    Then my banking information should be updated
-
-  # --- DOCUMENTS ---
-
-  Scenario: View document list
-    Given I navigate to the documents screen
-    Then I should see all my uploaded documents
-    And each document should show its status:
-      | status     |
-      | Approved   |
-      | Pending    |
-      | Rejected   |
-      | Expired    |
-
-  Scenario: View document scope
-    Given I am on the document list
-    When I tap on a specific document
-    Then I should see the document scope view
-    And I should see the document details and status
-
-  Scenario: Re-upload a rejected document
-    Given a document has been rejected
-    When I tap on the rejected document
-    And I upload a new version
-    And I submit
-    Then the document status should change to "Pending"
-
-  Scenario: Document nearing expiration
-    Given my vehicle insurance expires in 30 days
-    When I view my documents
-    Then I should see an expiration warning on the insurance document
-    And I should be prompted to upload a renewed document
-
-  # --- APP SETTINGS ---
-
-  Scenario: View app settings
-    Given I navigate to "App Settings"
-    Then I should see settings options
-
-  Scenario: Change language to French
-    Given I navigate to language settings
-    When I select "French"
-    Then the app language should change to French
-    And all UI text should display in French
-
-  # --- MESSAGES ---
-
-  Scenario: View messages
-    Given I navigate to "Messages"
-    Then I should see messages from HOVR
-    And messages should be sorted by date
-
-  # --- HELP AND SUPPORT ---
-
-  Scenario: Access help and support
-    Given I am on the home screen
-    When I tap "Help and Support"
-    Then I should see the help and support view
-    And I should see support contact options
-
-  Scenario: Contact support directly
-    Given I am on the help screen
-    When I tap "Contact Support"
-    Then I should see options to call or email HOVR support
-
-  # --- ALERTS ---
-
-  Scenario: View alerts list
-    Given there are system alerts
-    When I navigate to alerts
-    Then I should see the alerts list
-    And each alert should show title, date, and priority
-
-  Scenario: View single alert details
-    Given I am on the alerts list
-    When I tap on a specific alert
-    Then I should see the full alert details
-
-  Scenario: View alerts on home screen
-    Given there are important alerts
-    When I am on the home screen
-    Then I should see alert banners on the home view
-
-  # --- REFER AND EARN ---
-
-  Scenario: View driver referral code
-    Given I navigate to "Refer and Earn"
-    Then I should see my unique driver referral code
-    And I should see the referral reward structure
-
-  Scenario: Share driver referral code
-    Given I am on the refer and earn screen
-    When I tap "Share"
-    Then the system share sheet should open
-    And the referral link should be sharable
-
-  # --- DRAWER NAVIGATION ---
-
-  Scenario: Navigate via side drawer
-    Given I am on the home screen
-    When I open the side drawer
-    Then I should see navigation options:
-      | option            |
-      | Home              |
-      | Earnings          |
-      | Messages          |
-      | Membership        |
-      | Account           |
-      | Refer and Earn    |
-      | Help and Support  |
-
-  # --- EDGE CASES ---
-
-  Scenario: Profile update with network error
-    Given I am editing my profile
-    And there is no network
-    When I try to save changes
-    Then I should see a network error
-    And changes should not be persisted
-
-  Scenario: Log out from driver app
-    Given I am on the account screen
-    When I tap "Log Out"
-    And I confirm
-    Then I should be logged out
-    And I should be returned to the landing screen
+  @negative
+  Scenario: The missing driver picture requirement opens a photo upload page
+    When I switch to the "Co-Commute" dashboard tab
+    And I open the "driver pic" card
+    Then I should see all of these driver texts:
+      | Upload |
+      | Camera |

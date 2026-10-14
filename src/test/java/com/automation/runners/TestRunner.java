@@ -18,8 +18,10 @@ import io.cucumber.testng.CucumberOptions;
                 "html:target/cucumber-reports/cucumber.html",
                 "json:target/cucumber-reports/cucumber.json"
         },
-        monochrome = true
-        // tags = "@smoke"   // uncomment and set to filter which scenarios run
+        monochrome = true,
+        // @needs-ride features need a completed ride / approved driver the dev environment cannot give us.
+        // -Dcucumber.filter.tags=... on the command line replaces this default.
+        tags = "not @needs-ride"
 )
 public class TestRunner extends AbstractTestNGCucumberTests {
 }
