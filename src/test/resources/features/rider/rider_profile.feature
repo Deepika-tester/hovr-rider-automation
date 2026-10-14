@@ -1,173 +1,248 @@
 @rider @profile
-Feature: Rider Profile and Settings
+Feature: Rider Account, Profile and Settings
   As a registered rider
-  I want to manage my profile, saved places, and app settings
-  So that I can personalize my HOVR experience
+  I want to manage my profile, saved places, wallet and app settings
+  So that I can personalise my HOVR experience
 
-  # Derived from: hovr-rider-app/lib/features/home-view/presentation/pages/settings/
-  # Pages: account_view.dart, edit_profile.dart, user_profile_screen.dart,
-  #         saved_places_view.dart, add_new_place_view.dart, setting_view.dart,
-  #         language_settings_screen.dart, notification_preference_screen.dart
-  # Features: Profile edit, saved places (Home, Work, custom), language (EN/FR),
-  #           notification preferences, trip history, messages
+  # Explored on a real build (rider dev v6.3.0+588, emulator, India marketplace) on 2026-10-14.
+  # The Account tab (third bottom tab) lists: the profile card, Inbox / Wallet / Help tiles, "Refer a
+  # friend, earn $5", Settings, "Earn by driving", "Update the app" and "Need more help?".
+  #
+  # Findings from the run (these replace the earlier guess-based scenarios):
+  #  - Profile shows Legal Name, Preferred Name, Phone, Email, plus Delete Account and Logout. The pencil
+  #    opens "Edit profile": Preferred name / First name / Last name are editable; phone and email are
+  #    read-only. Saving shows the toast "Updated successfully!". An empty first name is NOT saved: the
+  #    form just stays open (no inline error text).
+  #  - Saved places live under Settings > Home / Add Work / Shortcuts (all open the same "Saved Places"
+  #    list). Add = "+" -> Name + Address (address autocompletes) -> Save. Saving blank fields shows
+  #    "Fill the field!". Opening a place gives "Edit saved place" with a trash icon (delete is immediate).
+  #  - Settings has two switches (Wheelchair Assistance, Verify Your Ride) and Language / Notifications.
+  #    Language offers English (US), French (Canada), Spanish, Turkish, Hindi, Punjabi, Arabic.
+  #  - The wallet has no balance, Google Pay as the default method, and only "Credit or debit card" can
+  #    be added. Inbox and Trips are empty for a new rider.
+  #  - The app shows "$" amounts even in the India marketplace (dev build quirk, noted not asserted).
+  #
+  # NOT automated: Delete Account (irreversible) and switching the language (re-localises every later
+  # screen) -- their entries are only checked for presence.
 
   Background:
     Given I am a registered rider
     And I am logged into the rider app
+    And I am located in a supported marketplace
+
+  # --- ACCOUNT MENU ---
+
+  @positive
+  Scenario: Account page lists every entry
+    Given I am on the Account page
+    Then I should see all of these texts:
+      | Inbox                |
+      | Wallet               |
+      | Help                 |
+      | Refer a friend       |
+      | Settings             |
+      | Earn by driving      |
+      | Update the app       |
+      | Need more help?      |
 
   # --- PROFILE ---
 
+  @positive
   Scenario: View my profile
-    Given I navigate to the account section
-    When I tap on my profile
-    Then I should see the user profile screen with:
-      | field          |
-      | Name           |
-      | Email          |
-      | Phone number   |
-      | Profile photo  |
+    Given I am on the Account page
+    When I open my profile
+    Then I should see all of these texts:
+      | Legal Name        |
+      | Preferred Name    |
+      | Phone             |
+      | Email             |
+      | Delete Account    |
+      | Logout            |
 
-  Scenario: Edit profile name
-    Given I am on the edit profile screen
-    When I change my first name to "Janet"
-    And I tap "Save"
-    Then my profile name should be updated to "Janet"
-    And I should see a success confirmation
+  @positive
+  Scenario: Edit my preferred name
+    Given I am on the Account page
+    When I open my profile
+    And I tap the edit pencil
+    And I set my preferred name to "Janu"
+    And I tap "Update"
+    Then I should see the text "Updated successfully"
+    And I should see the text "Janu"
 
-  Scenario: Edit profile with empty name
-    Given I am on the edit profile screen
-    When I clear the first name field
-    And I tap "Save"
-    Then I should see a validation error "Name is required"
+  @negative
+  Scenario: Saving with an empty first name does not update the profile
+    Given I am on the Account page
+    When I open my profile
+    And I tap the edit pencil
+    And I clear the first name on the edit form
+    And I tap "Update"
+    Then I should see the text "Edit profile"
+    And I should not see the text "Updated successfully"
+
+  @negative
+  Scenario: Phone number and email cannot be edited
+    Given I am on the Account page
+    When I open my profile
+    And I tap the edit pencil
+    Then the edit form should have exactly 3 editable fields
 
   # --- SAVED PLACES ---
 
-  Scenario: View saved places
-    Given I navigate to "Saved Places"
-    Then I should see my saved places list
-    And I should see preset categories "Home" and "Work"
+  @positive
+  Scenario: A new rider has no saved places
+    Given I am on the Account page
+    When I open the Saved Places list
+    Then I should see the text "No saved places found"
 
-  Scenario: Add home address
-    Given I am on the saved places screen
-    And "Home" has not been set
-    When I tap on "Home"
-    And I search for "123 Maple Ave, Toronto"
-    And I select the address from suggestions
-    And I save it
-    Then "Home" should be set to "123 Maple Ave, Toronto"
-    And it should appear on the home screen for quick booking
+  @positive
+  Scenario: Add a saved place and delete it again
+    Given I am on the Account page
+    And I open the Saved Places list
+    When I tap the add place button
+    And I enter the place name "Gym"
+    And I enter the place address "CP67 Mall Mohali"
+    And I choose the first address suggestion
+    And I tap "Save"
+    Then I should see the text "Gym"
+    When I open the saved place "Gym"
+    And I tap the delete icon
+    Then I should see the text "No saved places found"
 
-  Scenario: Add work address
-    Given I am on the saved places screen
-    When I tap on "Work"
-    And I search for and select "200 Bay St, Toronto"
-    And I save it
-    Then "Work" should be set to "200 Bay St, Toronto"
-
-  Scenario: Add a custom saved place
-    Given I am on the saved places screen
-    When I tap "Add New Place"
-    And I enter the label "Gym"
-    And I search for and select "50 Bloor St W, Toronto"
-    And I save it
-    Then I should see "Gym" in my saved places list
-
-  Scenario: Edit a saved place
-    Given I have a saved place "Home" at "123 Maple Ave, Toronto"
-    When I tap on "Home"
-    And I select "Edit"
-    And I change the address to "456 Oak St, Toronto"
-    And I save it
-    Then "Home" should be updated to "456 Oak St, Toronto"
-
-  Scenario: Delete a saved place
-    Given I have a custom saved place "Gym"
-    When I tap on "Gym"
-    And I select "Delete"
-    And I confirm the deletion
-    Then "Gym" should be removed from my saved places
-
-  # --- RIDE HISTORY ---
-
-  Scenario: View ride history
-    Given I have completed rides
-    When I navigate to the trips section
-    Then I should see a list of my past trips
-    And each trip should display:
-      | field            |
-      | Date             |
-      | Pickup address   |
-      | Drop-off address |
-      | Fare amount      |
-      | Trip status      |
-
-  Scenario: View trip receipt from history
-    Given I am on the trips list
-    When I tap on a completed trip
-    Then I should see the trip receipt view
-    And I should see the route name and time
-    And I should see the fare breakdown
-
-  Scenario: View ride history with no trips
-    Given I have not completed any trips
-    When I navigate to the trips section
-    Then I should see an empty state message
+  @negative
+  Scenario: Saving a place with blank fields is rejected
+    Given I am on the Account page
+    And I open the Saved Places list
+    When I tap the add place button
+    And I tap "Save"
+    Then I should see the text "Fill the field"
+    And I should see the text "Add new place"
 
   # --- SETTINGS ---
 
-  Scenario: Change app language to French
-    Given I navigate to "Settings" then "Language"
-    When I select "French"
-    Then the app language should change to French
-    And all UI text should be displayed in French
+  @positive
+  Scenario: Settings shows places, accessibility, safety and preferences
+    Given I am on the Account page
+    When I tap "Settings"
+    Then I should see all of these texts:
+      | Add Work              |
+      | Shortcuts             |
+      | Wheelchair Assistance |
+      | Verify Your Ride      |
+      | Language              |
+      | Notifications         |
 
-  Scenario: Change app language to English
-    Given the app is currently in French
-    When I navigate to language settings
-    And I select "English"
-    Then the app should switch back to English
+  @positive
+  Scenario: Turn Wheelchair Assistance on and off
+    Given I am on the Account page
+    When I tap "Settings"
+    And I toggle the "Wheelchair Assistance" switch
+    Then the "Wheelchair Assistance" switch should be on
+    When I toggle the "Wheelchair Assistance" switch
+    Then the "Wheelchair Assistance" switch should be off
 
-  Scenario: Manage notification preferences
-    Given I navigate to "Notification Settings"
-    Then I should see notification categories
-    When I toggle a notification category off
-    Then I should no longer receive notifications for that category
+  @positive
+  Scenario: Turn Verify Your Ride on and off
+    Given I am on the Account page
+    When I tap "Settings"
+    And I toggle the "Verify Your Ride" switch
+    Then the "Verify Your Ride" switch should be on
+    When I toggle the "Verify Your Ride" switch
+    Then the "Verify Your Ride" switch should be off
 
-  # --- MESSAGES ---
+  @positive
+  Scenario: Language settings list the supported languages
+    Given I am on the Account page
+    When I tap "Settings"
+    And I open the "Language" setting
+    Then I should see all of these texts:
+      | English (US)    |
+      | French (Canada) |
+      | Spanish         |
+      | Turkish         |
+      | Hindi           |
+      | Punjabi         |
+      | Arabic          |
 
-  Scenario: View messages inbox
-    Given I navigate to "Messages"
-    Then I should see my messages from HOVR
-    And messages should be sorted by date with newest first
+  @positive
+  Scenario: Notification preferences list their categories
+    Given I am on the Account page
+    When I tap "Settings"
+    And I open the "Notifications" setting
+    Then I should see all of these texts:
+      | Promotions and Tips |
+      | Travelling          |
+      | Partner Offers      |
+      | Suggestions         |
+      | Receipts            |
 
-  # --- ACCOUNT ACTIONS ---
+  # --- WALLET, INBOX, HELP, REFERRAL ---
 
-  Scenario: Log out of the app
-    Given I am on the settings screen
-    When I tap "Log Out"
-    And I confirm the logout
-    Then I should be logged out
-    And I should be returned to the landing screen
+  @positive
+  Scenario: A new rider's wallet has no balance and lists Google Pay
+    Given I am on the Account page
+    When I open my wallet
+    Then I should see all of these texts:
+      | Total              |
+      | No balance yet     |
+      | Payment Methods    |
+      | Google Pay         |
+      | Add payment method |
 
-  # --- HELP & SUPPORT ---
+  @positive
+  Scenario: Choosing Google Pay makes it the default payment method
+    Given I am on the Account page
+    When I open my wallet
+    And I tap "Google Pay"
+    Then I should see the text "Default"
 
-  Scenario: Access help from settings
-    Given I am on the settings screen
-    When I tap "Help"
-    Then I should see help categories:
-      | category             |
-      | Using HOVR           |
-      | Payments and Pricing |
-      | Account and Data     |
-      | App and Features     |
+  @positive
+  Scenario: Adding a payment method offers credit or debit card
+    Given I am on the Account page
+    When I open my wallet
+    And I tap "Add payment method"
+    Then I should see the text "Add a payment method"
+    And I should see the text "Credit or debit card"
 
-  Scenario: Access Zendesk support
-    Given I am on the help screen
-    When I tap "Need More Help"
-    Then I should be directed to the Zendesk support interface
+  @positive
+  Scenario: Inbox is empty for a new rider
+    Given I am on the Account page
+    When I tap "Inbox"
+    Then I should see all of these texts:
+      | Broadcast |
+      | Trip      |
+      | Payment   |
+      | Safety    |
+    And I should see the text "all caught up"
 
-  Scenario: Search help articles
-    Given I am on the help screen
-    When I tap the search bar
-    And I search for "cancel ride"
-    Then I should see relevant FAQ articles
+  @positive
+  Scenario: Help opens the support tickets page
+    Given I am on the Account page
+    When I tap "Need more help?"
+    Then I should see all of these texts:
+      | Support tickets |
+      | FAQ             |
+      | No open tickets |
+      | Create ticket   |
+
+  @positive
+  Scenario: Refer a friend shows the referral link and code entry
+    Given I am on the Account page
+    When I tap "Refer a friend, earn $5"
+    Then I should see all of these texts:
+      | Refer and earn          |
+      | REFERRAL LINK           |
+      | Share with Rider        |
+      | Enter a referral code   |
+      | Referral history        |
+
+  # --- TRIPS ---
+
+  @positive
+  Scenario: Trips tab is empty for a rider with no rides
+    Given I am on the Account page
+    When I open the "Trips" bottom tab
+    Then I should see all of these texts:
+      | Upcoming         |
+      | No upcoming trips |
+      | Past             |
+      | HOVR ride        |
