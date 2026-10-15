@@ -138,7 +138,10 @@ public class RegistrationSteps {
     // (an earlier prod build (v581) didn't expose one at all in the accessibility tree, which is
     // why country selection used to be entirely unimplemented — see the old
     // UnsupportedOperationException this replaces).
-    private void selectIndiaCountryCode() {
+    public void selectIndiaCountryCode() {
+        if ("canada".equalsIgnoreCase(com.automation.utils.ConfigReader.get("market", "india"))) {
+            return; // the phone screen already defaults to +1, which is what a Canadian number needs
+        }
         generic.tapPublic(COUNTRY_CODE_SELECTOR);
         // CONFIRMED 2026-09-17: opening the picker does NOT remove the original phone-number
         // EditText from the tree -- it's still there (now hidden behind the picker) and sorts
@@ -154,6 +157,7 @@ public class RegistrationSteps {
         java.util.List<org.openqa.selenium.WebElement> editTexts =
                 new org.openqa.selenium.support.ui.WebDriverWait(generic.driverPublic(), java.time.Duration.ofSeconds(10))
                         .until(d -> {
+                            generic.dismissUpdatePopupPublic();
                             java.util.List<org.openqa.selenium.WebElement> found =
                                     generic.findAllPublic(By.className("android.widget.EditText"));
                             return found.size() >= 2 ? found : null;
@@ -178,6 +182,7 @@ public class RegistrationSteps {
         // CONFIRMED 2026-09-18: clear first -- same stale-state class of bug as the OTP field
         // (see enterOtpCode's javadoc). A number left over from an earlier scenario/failed run
         // would otherwise get a fresh number appended onto it instead of replaced.
+        generic.dismissUpdatePopupPublic();
         org.openqa.selenium.WebElement field =
                 generic.waitForPublic(By.className("android.widget.EditText"));
         field.clear();
@@ -266,8 +271,12 @@ public class RegistrationSteps {
     // selectIndiaCountryCode's javadoc. There's no equivalent always-fictional prefix block for
     // Indian mobile numbers to anchor on, but the bypass doesn't require a real subscriber, just
     // a fresh 10-digit number starting with a valid mobile prefix (6-9) each run.
-    private static String uniqueTestPhoneNumber() {
-        return "9" + String.format("%09d", System.currentTimeMillis() % 1_000_000_000L);
+    public static String uniqueTestPhoneNumber() {
+        // Canada runs sign up with fictional +1 numbers (the 111111 bypass works there once the GPS is in Canada);
+        // India runs need a +91 number. The market comes from the platform config.
+        return "canada".equalsIgnoreCase(com.automation.utils.ConfigReader.get("market", "india"))
+                ? com.automation.spec.rider.PhonePool.canadian()
+                : com.automation.spec.rider.PhonePool.indian();
     }
 
     @Then("I should be navigated to the {string} screen")
@@ -319,6 +328,7 @@ public class RegistrationSteps {
     // catch up before something else touches this screen. A short pause after entering it fixes
     // this without needing to guess at what's racing what internally.
     private void enterOtpCode(String code) {
+        generic.dismissUpdatePopupPublic();
         org.openqa.selenium.WebElement field =
                 generic.waitForPublic(By.className("android.widget.EditText"));
         field.clear();

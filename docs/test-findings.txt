@@ -1,0 +1,28 @@
+# area | finding (spec vs real build) | where
+Auth (UI) | Empty phone shows "Please enter your phone number." (spec: "Invalid phone number.") | 01_authentication: Phone number validation
+Auth (UI) | A malformed number such as "12345" is accepted and goes on to the OTP screen ("code sent to you at +112345"); the backend then answers 503 "failed to send verification code" | 01_authentication: Phone number validation; API 01
+Auth (UI) | The OTP screen prints the number without a space after the country code ("+919..."), the spec writes "+1 4165550123" | 01_authentication: Verify OTP successfully (treated as cosmetic)
+Auth (UI) | The Terms screen has no agreement checkbox: "Agree and continue" is the consent, so "You must agree to the Terms of Service to continue." never appears | 01_authentication: Terms must be accepted
+Auth (UI) | Skipping the referral code leads to a Payment Methods step (with its own Skip) before "Welcome to HOVR"; "I'll ride later" is not offered | 01_authentication: Skip referral code during onboarding
+Auth (UI) | First-name validation text "First name is not valid" is not shown for "J@ne1" | 01_authentication: Name validation
+Auth (UI) | With the device outside the service area the app still shows ride home after onboarding (no "We're not in your area... yet." page) | 01_authentication: Rider outside service region
+Auth (UI) | No notification-permission screen or prompt appears at the end of onboarding when the permission is missing | 01_authentication: Notification permission prompt
+Home (UI) | The pickup field shows the resolved address (e.g. "MPHF+73V, Sector 67, ..."), not "Current location" | 02_home: Open plan your trip
+Home (UI) | Swipe guide wording is "Swipe up anywhere on the panel to open it." and the dismiss button is "Got it" (spec: "Swipe the panel" / "Skip") | 02_home: Swipe guide scenarios
+Home (UI) | With location services off the app shows a blocking "Enable Location Services" dialog (OPEN SETTINGS / RETRY), not "Unable to fetch current location." | 02_home: Location unavailable
+Home (UI) | The scheduling picker enforces 90 minutes ahead; the API only requires 30 minutes | 02_home: Schedule / API 04: Schedule ride with invalid time
+Booking (UI) | Ride options show a price but no "Pickup in" ETA; the fare breakdown has Fare, Subtotal, Fees and Est. Total but no "Tax" line; amounts show "$" although the backend quotes CAD | 03_ride_booking
+Co-Commute (UI) | There is no "Search journeys" control; a leave time is always preselected, so "Choose a leave time" cannot appear; with location denied the app re-asks for the permission instead of showing "Turn on location to find nearby journeys."; the middle tab is labelled "My trips"/"My requests" | 04_co_commute
+Account (UI) | Saving a place with blank fields shows "Fill the field!" (spec: "Please fill all fields and select an address from suggestions"); the first delete of a saved place sometimes does not persist | 06_account
+Account (UI) | "Check for update" closes the app (process dies, reproducible); the Receipts preference is a single-choice list with no Email/Push/SMS switches; selecting the already-active language shows no confirmation | 06_account
+Payment (UI) | Wallet empty state offers "Add payment method" (spec: "Add a payment method"); the add sheet lists only "Credit or debit card" (Google Pay is in the wallet list); an invalid card shows inline Adyen errors, not "Payment failed..."; card actions are "Make Default"/"Delete", confirm button is "CONFIRM PREAUTHORIZATION" | 07_payment
+Referral (UI) | The copy action is the icon at the end of the link row (it does show "Copied to clipboard!"); redeeming codes is Canada-only so those scenarios are not run | 09_refer_and_earn
+API errors | Validation and auth failures come back as HTTP 500 UNKNOWN instead of INVALID_ARGUMENT/UNAUTHENTICATED: bad email, empty first name, wrong OTP ("OTP Mis Match"), missing/expired/malformed token ("Not Logged In"), unknown card ("Invalid arugemt") | API 01, 02, 03
+API permissions | GetRiderProfile and GetWallet with another rider's id return OK (the id is ignored) instead of PERMISSION_DENIED | API 02, 07
+API data | CreateSavedPlace accepts a place with no coordinates; GetSavedPlace of an unknown id returns OK with an empty place (spec: NOT_FOUND); UpdateRiderProfile accepts an email and silently ignores it | API 02
+API leaks | Internal errors reach the client: DynamoDB "ConditionalCheckFailedException" (saved-place update with the wrong shape, redeeming a referral twice) | API 02, 07
+API ride | FindRide with an unsupported pickup returns INVALID_ARGUMENT (spec: FAILED_PRECONDITION/OUT_OF_RANGE); service results carry no pickup ETA; FindNearbyDrivers answers HTTP 415 to JSON (streaming RPC) | API 04
+API co-commute | Journeys carry departure time, driver and vehicle but no seats-left or price fields | API 06
+API notifications | GetNotificationPrefs is UNIMPLEMENTED (501); MakeMaskedCall with no trip returns OK "Mapping not found" instead of FAILED_PRECONDITION | API 08
+API referral | GetReferralProfile returns the code but no invite link (the app builds ridehovr.com/invite/<code> itself) | API 07
+OTP rate limit | The backend enforces a per-number resend cooldown (HTTP 429 resource_exhausted, "please wait N seconds"); the daily limit scenario is not run | API 01

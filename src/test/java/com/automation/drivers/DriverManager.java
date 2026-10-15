@@ -115,6 +115,8 @@ public class DriverManager {
         String[] permissions = {
                 "android.permission.ACCESS_FINE_LOCATION",
                 "android.permission.ACCESS_COARSE_LOCATION",
+                "android.permission.ACCESS_BACKGROUND_LOCATION", // driver app's "Background Location Required" dialog loops without it
+                "android.permission.CAMERA",
                 "android.permission.POST_NOTIFICATIONS"
         };
         String appPackage = ConfigReader.get("appPackage", "");
@@ -224,6 +226,12 @@ public class DriverManager {
         // blocks the very first screen behind an OS "Allow location?" dialog our step defs
         // don't know how to dismiss. Confirmed necessary on a real device 2026-08-10.
         options.setAutoGrantPermissions(true);
+
+        // Two emulators driven at the same time (rider + driver) need their own UiAutomator2 server port each.
+        String systemPort = ConfigReader.get("systemPort", "");
+        if (!systemPort.isBlank()) {
+            options.setSystemPort(Integer.parseInt(systemPort));
+        }
 
         return options;
     }

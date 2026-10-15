@@ -12,14 +12,17 @@ import io.cucumber.testng.CucumberOptions;
  */
 @CucumberOptions(
         features = "src/test/resources/features/rider",
-        glue = {"com.automation.stepdefinitions", "com.automation.hooks"},
+        glue = {"com.automation.spec.rider", "com.automation.hooks"},
         plugin = {
                 "pretty",
                 "html:target/cucumber-reports/cucumber.html",
                 "json:target/cucumber-reports/cucumber.json"
         },
-        monochrome = true
-        // tags = "@smoke"   // uncomment and set to filter which scenarios run
+        monochrome = true,
+        // @blocked scenarios need something this environment cannot produce (an approved driver, another rider,
+        // server fault injection, ...) and each carries a "# BLOCKED:" comment saying why.
+        // -Dcucumber.filter.tags=... on the command line replaces this default.
+        tags = "not @blocked and not @india-only-skip"
 )
 public class TestRunner extends AbstractTestNGCucumberTests {
 }
