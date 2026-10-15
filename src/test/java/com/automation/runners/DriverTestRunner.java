@@ -26,14 +26,14 @@ import io.cucumber.testng.CucumberOptions;
  */
 @CucumberOptions(
         features = "src/test/resources/features/driver",
-        glue = {"com.automation.driver.stepdefinitions", "com.automation.hooks"},
+        glue = {"com.automation.spec.driver", "com.automation.hooks"},
         plugin = {
                 "pretty",
                 "html:target/cucumber-reports/driver/cucumber.html",
                 "json:target/cucumber-reports/driver/cucumber.json"
         },
         monochrome = true,
-        tags = "@profile-auth"
+        tags = "not @blocked and not @india-only-skip"
 )
 public class DriverTestRunner extends AbstractTestNGCucumberTests {
 }

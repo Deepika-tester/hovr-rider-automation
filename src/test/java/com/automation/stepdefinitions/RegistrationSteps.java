@@ -139,6 +139,9 @@ public class RegistrationSteps {
     // why country selection used to be entirely unimplemented — see the old
     // UnsupportedOperationException this replaces).
     public void selectIndiaCountryCode() {
+        if ("canada".equalsIgnoreCase(com.automation.utils.ConfigReader.get("market", "india"))) {
+            return; // the phone screen already defaults to +1, which is what a Canadian number needs
+        }
         generic.tapPublic(COUNTRY_CODE_SELECTOR);
         // CONFIRMED 2026-09-17: opening the picker does NOT remove the original phone-number
         // EditText from the tree -- it's still there (now hidden behind the picker) and sorts
@@ -269,7 +272,11 @@ public class RegistrationSteps {
     // Indian mobile numbers to anchor on, but the bypass doesn't require a real subscriber, just
     // a fresh 10-digit number starting with a valid mobile prefix (6-9) each run.
     public static String uniqueTestPhoneNumber() {
-        return "9" + String.format("%09d", System.currentTimeMillis() % 1_000_000_000L);
+        // Canada runs sign up with fictional +1 numbers (the 111111 bypass works there once the GPS is in Canada);
+        // India runs need a +91 number. The market comes from the platform config.
+        return "canada".equalsIgnoreCase(com.automation.utils.ConfigReader.get("market", "india"))
+                ? com.automation.spec.rider.PhonePool.canadian()
+                : com.automation.spec.rider.PhonePool.indian();
     }
 
     @Then("I should be navigated to the {string} screen")

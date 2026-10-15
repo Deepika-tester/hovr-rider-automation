@@ -227,6 +227,12 @@ public class DriverManager {
         // don't know how to dismiss. Confirmed necessary on a real device 2026-08-10.
         options.setAutoGrantPermissions(true);
 
+        // Two emulators driven at the same time (rider + driver) need their own UiAutomator2 server port each.
+        String systemPort = ConfigReader.get("systemPort", "");
+        if (!systemPort.isBlank()) {
+            options.setSystemPort(Integer.parseInt(systemPort));
+        }
+
         return options;
     }
 

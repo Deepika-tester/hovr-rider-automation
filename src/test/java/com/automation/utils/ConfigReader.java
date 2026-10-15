@@ -24,6 +24,8 @@ public class ConfigReader {
             case "emulator" -> "emulator.properties";
             case "driver" -> "driver.properties";
             case "driver-emulator" -> "driver-emulator.properties";
+            case "emulator-canada" -> "emulator-canada.properties";
+            case "driver-canada" -> "driver-canada.properties";
             default -> "config.properties";
         };
         String path = CONFIG_DIR + fileName;

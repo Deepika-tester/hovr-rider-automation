@@ -4,7 +4,7 @@ import io.cucumber.testng.AbstractTestNGCucumberTests;
 import io.cucumber.testng.CucumberOptions;
 
 /**
- * Entry point for the backend/API suite (api_auth, api_dispatch, api_pricing).
+ * Entry point for the backend/API suite (features/api: the rider app's ConnectRPC services).
  * Deliberately separate from com.automation.runners.TestRunner (the Appium mobile
  * suite) — different glue package, different Hooks (no driver lifecycle), and its
  * own report output directory.
@@ -17,13 +17,16 @@ import io.cucumber.testng.CucumberOptions;
  */
 @CucumberOptions(
         features = "src/test/resources/features/api",
-        glue = {"com.automation.api.stepdefinitions", "com.automation.api.hooks"},
+        glue = {"com.automation.spec.api"},
         plugin = {
                 "pretty",
                 "html:target/cucumber-reports/api/cucumber.html",
                 "json:target/cucumber-reports/api/cucumber.json"
         },
-        monochrome = true
+        monochrome = true,
+        // @blocked scenarios need state this suite must not create on the shared dev backend (real trips, bookings,
+        // saved cards) or fault injection; each carries a "# BLOCKED:" comment saying why.
+        tags = "not @blocked and not @india-only-skip"
 )
 public class ApiTests extends AbstractTestNGCucumberTests {
 }
